@@ -1,0 +1,32 @@
+# Email Campaign System - Environment Configuration
+
+# Copy these settings to your .env file:
+
+# Database Configuration (already set to SQLite)
+DB_CONNECTION=sqlite
+
+# Queue Configuration (already set to database)
+QUEUE_CONNECTION=database
+
+# SendGrid SMTP Configuration
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.sendgrid.net
+MAIL_PORT=587
+MAIL_USERNAME=apikey
+MAIL_PASSWORD=YOUR_SENDGRID_API_KEY_HERE
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="your-default@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+# Instructions:
+# 1. Replace YOUR_SENDGRID_API_KEY_HERE with your actual SendGrid API key
+# 2. Replace your-default@example.com with your verified sender email
+# 3. Update MAIL_FROM_NAME if desired
+
+# For testing with Mailtrap (alternative):
+# MAIL_MAILER=smtp
+# MAIL_HOST=sandbox.smtp.mailtrap.io
+# MAIL_PORT=2525
+# MAIL_USERNAME=your_mailtrap_username
+# MAIL_PASSWORD=your_mailtrap_password
+# MAIL_ENCRYPTION=tls
