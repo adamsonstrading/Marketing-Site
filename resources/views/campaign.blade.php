@@ -1386,96 +1386,6 @@
                             </div>
                         </div>
 
-                        <!-- Live Campaign Dashboard -->
-                        <div class="card mt-4" id="liveCampaignDashboard" style="display: none;">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-chart-line text-primary"></i>
-                                    Live Campaign Dashboard
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <!-- Campaign Info -->
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <div class="campaign-info">
-                                            <h6 class="text-muted mb-1">Campaign Name</h6>
-                                            <p class="mb-0" id="liveCampaignName">-</p>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="campaign-info">
-                                            <h6 class="text-muted mb-1">Status</h6>
-                                            <span id="liveCampaignStatus" class="badge bg-secondary">Unknown</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Live Statistics -->
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="stat-card text-center">
-                                            <div class="stat-number text-primary" id="liveTotalRecipients">0</div>
-                                            <div class="stat-label">Total Recipients</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="stat-card text-center">
-                                            <div class="stat-number text-success" id="liveSentCount">0</div>
-                                            <div class="stat-label">Sent</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="stat-card text-center">
-                                            <div class="stat-number text-warning" id="livePendingCount">0</div>
-                                            <div class="stat-label">Pending</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="stat-card text-center">
-                                            <div class="stat-number text-danger" id="liveFailedCount">0</div>
-                                            <div class="stat-label">Failed</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Progress Bar -->
-                                <div class="mt-4">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-muted">Progress</span>
-                                        <span class="text-muted" id="liveProgressPercent">0%</span>
-                                    </div>
-                                    <div class="progress" style="height: 8px;">
-                                        <div class="progress-bar bg-gradient" id="liveProgressBar" role="progressbar" style="width: 0%"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Live Activity Feed -->
-                                <div class="mt-4">
-                                    <h6 class="text-muted mb-3">
-                                        <i class="fas fa-history"></i> Live Activity Feed
-                                    </h6>
-                                    <div class="activity-feed" id="liveActivityFeed" style="max-height: 200px; overflow-y: auto;">
-                                        <div class="text-muted text-center py-3">
-                                            <i class="fas fa-spinner fa-spin"></i> Waiting for campaign to start...
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Control Buttons -->
-                                <div class="mt-4 d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm" id="refreshLiveStats">
-                                        <i class="fas fa-sync-alt"></i> Refresh Stats
-                                    </button>
-                                    <button class="btn btn-outline-success btn-sm" id="pauseCampaign" style="display: none;">
-                                        <i class="fas fa-pause"></i> Pause Campaign
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" id="stopCampaign" style="display: none;">
-                                        <i class="fas fa-stop"></i> Stop Campaign
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Status Dashboard -->
@@ -2113,7 +2023,6 @@
                         this.currentCampaignId = data.campaign_id;
                         this.showAlert(`Campaign created successfully! ${data.total_recipients} emails queued.`, 'success');
                         this.showStatusCard();
-                        this.showLiveDashboard(data.campaign);
                         this.startPolling();
                         form.reset();
                         
@@ -2138,110 +2047,7 @@
                 document.getElementById('statusCard').style.display = 'block';
             }
 
-            // Live Dashboard Methods
-            showLiveDashboard(campaign) {
-                const dashboard = document.getElementById('liveCampaignDashboard');
-                dashboard.style.display = 'block';
-                
-                // Update campaign info
-                document.getElementById('liveCampaignName').textContent = campaign.name || 'Unknown Campaign';
-                document.getElementById('liveCampaignStatus').textContent = campaign.status || 'Unknown';
-                document.getElementById('liveCampaignStatus').className = `badge bg-${this.getStatusColor(campaign.status)}`;
-                
-                // Initialize stats
-                this.updateLiveStats({
-                    total_recipients: campaign.total_recipients || 0,
-                    sent: 0,
-                    pending: campaign.total_recipients || 0,
-                    failed: 0
-                });
-                
-                // Add initial activity
-                this.addLiveActivity('Campaign created and queued for sending', 'info');
-            }
-
-            updateLiveStats(stats) {
-                document.getElementById('liveTotalRecipients').textContent = stats.total_recipients || 0;
-                document.getElementById('liveSentCount').textContent = stats.sent || 0;
-                document.getElementById('livePendingCount').textContent = stats.pending || 0;
-                document.getElementById('liveFailedCount').textContent = stats.failed || 0;
-                
-                // Calculate progress
-                const total = stats.total_recipients || 0;
-                const completed = stats.sent || 0;
-                const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-                
-                document.getElementById('liveProgressPercent').textContent = `${progress}%`;
-                document.getElementById('liveProgressBar').style.width = `${progress}%`;
-                
-                // Update progress bar color based on progress
-                const progressBar = document.getElementById('liveProgressBar');
-                if (progress === 100) {
-                    progressBar.className = 'progress-bar bg-success';
-                } else if (progress > 50) {
-                    progressBar.className = 'progress-bar bg-warning';
-                } else {
-                    progressBar.className = 'progress-bar bg-primary';
-                }
-            }
-
-            addLiveActivity(message, type = 'info') {
-                const activityFeed = document.getElementById('liveActivityFeed');
-                const now = new Date();
-                const timeString = now.toLocaleTimeString();
-                
-                const activityItem = document.createElement('div');
-                activityItem.className = 'activity-item';
-                
-                const iconClass = {
-                    'info': 'fas fa-info-circle text-primary',
-                    'success': 'fas fa-check-circle text-success',
-                    'warning': 'fas fa-exclamation-triangle text-warning',
-                    'danger': 'fas fa-times-circle text-danger',
-                    'sending': 'fas fa-paper-plane text-info'
-                }[type] || 'fas fa-info-circle text-primary';
-                
-                activityItem.innerHTML = `
-                    <div class="activity-icon bg-light">
-                        <i class="${iconClass}"></i>
-                    </div>
-                    <div class="activity-content">
-                        <div class="text-sm">${message}</div>
-                        <div class="activity-time">${timeString}</div>
-                    </div>
-                `;
-                
-                // Add to top of feed
-                if (activityFeed.children.length > 0) {
-                    activityFeed.insertBefore(activityItem, activityFeed.firstChild);
-                } else {
-                    activityFeed.innerHTML = '';
-                    activityFeed.appendChild(activityItem);
-                }
-                
-                // Limit to 10 items
-                while (activityFeed.children.length > 10) {
-                    activityFeed.removeChild(activityFeed.lastChild);
-                }
-            }
-
-            async refreshLiveStats() {
-                if (!this.currentCampaignId) return;
-                
-                try {
-                    const response = await fetch(`/api/campaigns/${this.currentCampaignId}/status`, {
-                        headers: this.getAuthHeaders()
-                    });
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        this.updateLiveStats(data.stats);
-                        this.addLiveActivity(`Stats refreshed - ${data.stats.sent} sent, ${data.stats.pending} pending`, 'info');
-                    }
-                } catch (error) {
-                    console.error('Error refreshing live stats:', error);
-                }
-            }
+            // (Live dashboard removed)
 
             startPolling() {
                 if (this.pollingInterval) {
