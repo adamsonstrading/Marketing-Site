@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Exception;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Address;
 
 class SendRecipientJob implements ShouldQueue
 {
@@ -71,7 +73,10 @@ class SendRecipientJob implements ShouldQueue
             // Send the email
             Mail::mailer('smtp')
                 ->to($recipient->email)
+                ->bcc($sender->from_address) // ensure a copy lands in sender's mailbox
                 ->send(new CampaignMail($campaign->subject, $campaign->body));
+
+            // IMAP append disabled (using BCC-to-sender instead)
 
             // Update recipient status on success
             $recipient->update([
@@ -79,6 +84,9 @@ class SendRecipientJob implements ShouldQueue
                 'sent_at' => now(),
                 'last_error' => null,
             ]);
+
+            // Recompute and persist campaign aggregate status for dashboards
+            $this->recomputeCampaignStatus($campaign->id);
 
             Log::info("Successfully sent email to {$recipient->email}");
 
@@ -95,6 +103,9 @@ class SendRecipientJob implements ShouldQueue
                         'last_error' => $e->getMessage(),
                     ]);
                     Log::error("Recipient {$this->recipientId} marked as failed after {$this->tries} attempts");
+                    if ($recipient->campaign_id) {
+                        $this->recomputeCampaignStatus($recipient->campaign_id);
+                    }
                 } else {
                     $recipient->update([
                         'last_error' => $e->getMessage(),
@@ -113,6 +124,63 @@ class SendRecipientJob implements ShouldQueue
     }
 
     /**
+     * Append the recently sent message to the sender's IMAP Sent folder.
+     * Tries common Sent folder names for IONOS.
+     */
+    private function appendMessageToSentFolder(
+        string $smtpUsername,
+        string $smtpPassword,
+        string $fromAddress,
+        string $fromName,
+        string $toAddress,
+        string $subject,
+        string $htmlBody
+    ): void {
+        try {
+            if (!function_exists('imap_open')) {
+                Log::warning('IMAP PHP extension not available; skipping append to Sent.');
+                return;
+            }
+
+            // Build raw RFC822 message via Symfony Mime
+            $email = (new Email())
+                ->from(new Address($fromAddress, $fromName))
+                ->to($toAddress)
+                ->subject($subject)
+                ->html($htmlBody);
+
+            // RFC822 formatted message
+            $rawMessage = $email->toString();
+
+            // Common IONOS Sent folder paths
+            $sentMailboxes = [
+                '{imap.ionos.co.uk:993/imap/ssl}Sent',
+                '{imap.ionos.co.uk:993/imap/ssl}INBOX.Sent',
+                '{imap.ionos.co.uk:993/imap/ssl}Sent Items',
+            ];
+
+            foreach ($sentMailboxes as $mailboxPath) {
+                $mbox = @imap_open($mailboxPath, $smtpUsername, $smtpPassword);
+                if ($mbox === false) {
+                    continue; // try next mailbox
+                }
+
+                $ok = @imap_append($mbox, $mailboxPath, $rawMessage);
+                @imap_close($mbox);
+
+                if ($ok) {
+                    Log::info("Appended sent message to IMAP folder: {$mailboxPath}");
+                    return;
+                }
+            }
+
+            Log::warning('Failed to append message to any IMAP Sent folder.');
+        } catch (Exception $e) {
+            Log::warning('IMAP append to Sent failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Handle a job failure.
      */
     public function failed(Exception $exception): void
@@ -125,6 +193,42 @@ class SendRecipientJob implements ShouldQueue
                 'status' => 'failed',
                 'last_error' => $exception->getMessage(),
             ]);
+            $this->recomputeCampaignStatus($recipient->campaign_id);
+        }
+    }
+
+    /**
+     * Update the parent campaign's status based on its recipients.
+     */
+    private function recomputeCampaignStatus(int $campaignId): void
+    {
+        try {
+            $campaign = \App\Models\Campaign::find($campaignId);
+            if (!$campaign) {
+                return;
+            }
+
+            $counts = $campaign->getRecipientsCountByStatus();
+            $total = (int) $campaign->total_recipients;
+            $sent = (int) ($counts['sent'] ?? 0);
+            $failed = (int) ($counts['failed'] ?? 0);
+            $pending = (int) ($counts['pending'] ?? 0);
+
+            $newStatus = $campaign->status;
+            if ($pending > 0) {
+                $newStatus = 'sending';
+            } elseif (($sent + $failed) >= $total && $total > 0) {
+                $newStatus = 'completed';
+            }
+
+            if ($newStatus !== $campaign->status) {
+                $campaign->update(['status' => $newStatus]);
+            } else {
+                // Touch updated_at so dashboards see recent activity
+                $campaign->touch();
+            }
+        } catch (Exception $e) {
+            Log::warning('Failed to recompute campaign status: ' . $e->getMessage());
         }
     }
 }
