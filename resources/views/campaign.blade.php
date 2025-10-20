@@ -903,6 +903,77 @@
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
         }
 
+        /* Live Campaign Dashboard Styles */
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .campaign-info {
+            background: var(--secondary-bg);
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+
+        .activity-feed {
+            background: var(--secondary-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
         [data-theme="light"] .btn-primary:hover {
             box-shadow: 0 10px 25px rgba(0, 123, 255, 0.3);
         }
@@ -1211,10 +1282,23 @@
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-group">
+                                                <label for="smtpConfigSelect" class="form-label">SMTP Configuration</label>
+                                                <select class="form-select" id="smtpConfigSelect" name="smtp_configuration_id" required>
+                                                    <option value="">Loading SMTP configurations...</option>
+                                                </select>
+                                                <div class="form-text">Choose which email service to use for sending</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
                                                 <label for="senderSelect" class="form-label">Sender</label>
                                                 <select class="form-select" id="senderSelect" name="sender_id" required>
                                                     <option value="">Loading senders...</option>
                                                 </select>
+                                                <div class="form-text">Choose the sender for this campaign</div>
                                             </div>
                                         </div>
                                     </div>
@@ -1299,6 +1383,97 @@
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+
+                        <!-- Live Campaign Dashboard -->
+                        <div class="card mt-4" id="liveCampaignDashboard" style="display: none;">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-line text-primary"></i>
+                                    Live Campaign Dashboard
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Campaign Info -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="campaign-info">
+                                            <h6 class="text-muted mb-1">Campaign Name</h6>
+                                            <p class="mb-0" id="liveCampaignName">-</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="campaign-info">
+                                            <h6 class="text-muted mb-1">Status</h6>
+                                            <span id="liveCampaignStatus" class="badge bg-secondary">Unknown</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Live Statistics -->
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center">
+                                            <div class="stat-number text-primary" id="liveTotalRecipients">0</div>
+                                            <div class="stat-label">Total Recipients</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center">
+                                            <div class="stat-number text-success" id="liveSentCount">0</div>
+                                            <div class="stat-label">Sent</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center">
+                                            <div class="stat-number text-warning" id="livePendingCount">0</div>
+                                            <div class="stat-label">Pending</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center">
+                                            <div class="stat-number text-danger" id="liveFailedCount">0</div>
+                                            <div class="stat-label">Failed</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Progress Bar -->
+                                <div class="mt-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted">Progress</span>
+                                        <span class="text-muted" id="liveProgressPercent">0%</span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-gradient" id="liveProgressBar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Live Activity Feed -->
+                                <div class="mt-4">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="fas fa-history"></i> Live Activity Feed
+                                    </h6>
+                                    <div class="activity-feed" id="liveActivityFeed" style="max-height: 200px; overflow-y: auto;">
+                                        <div class="text-muted text-center py-3">
+                                            <i class="fas fa-spinner fa-spin"></i> Waiting for campaign to start...
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Control Buttons -->
+                                <div class="mt-4 d-flex gap-2">
+                                    <button class="btn btn-outline-primary btn-sm" id="refreshLiveStats">
+                                        <i class="fas fa-sync-alt"></i> Refresh Stats
+                                    </button>
+                                    <button class="btn btn-outline-success btn-sm" id="pauseCampaign" style="display: none;">
+                                        <i class="fas fa-pause"></i> Pause Campaign
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" id="stopCampaign" style="display: none;">
+                                        <i class="fas fa-stop"></i> Stop Campaign
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1468,6 +1643,7 @@
 
             init() {
                 this.loadSenders();
+                this.loadSmtpConfigurations();
                 this.setupEventListeners();
                 this.loadDashboardData();
             }
@@ -1482,6 +1658,55 @@
                     'X-CSRF-TOKEN': this.getAuthToken(),
                     'Accept': 'application/json'
                 };
+            }
+
+            async loadSmtpConfigurations() {
+                try {
+                    console.log('Loading SMTP configurations...');
+                    
+                    const response = await fetch('/api/smtp-configurations/active', {
+                        headers: this.getAuthHeaders()
+                    });
+                    
+                    console.log('SMTP Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('SMTP Response data:', data);
+                    
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to load SMTP configurations');
+                    }
+                    
+                    const select = document.getElementById('smtpConfigSelect');
+                    select.innerHTML = '<option value="">Select SMTP Configuration...</option>';
+                    
+                    if (data.configurations && data.configurations.length > 0) {
+                        data.configurations.forEach(config => {
+                            const option = document.createElement('option');
+                            option.value = config.id;
+                            option.textContent = `${config.name} (${config.from_address})`;
+                            if (config.is_default) {
+                                option.textContent += ' - Default';
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+                        console.log('Loaded', data.configurations.length, 'SMTP configurations');
+                    } else {
+                        select.innerHTML = '<option value="">No SMTP configurations available</option>';
+                        console.log('No SMTP configurations found');
+                    }
+                } catch (error) {
+                    console.error('Error loading SMTP configurations:', error);
+                    this.showAlert('Failed to load SMTP configurations: ' + error.message, 'danger');
+                    
+                    const select = document.getElementById('smtpConfigSelect');
+                    select.innerHTML = '<option value="">Error loading SMTP configurations</option>';
+                }
             }
 
             async loadSenders() {
@@ -1516,6 +1741,7 @@
                             const option = document.createElement('option');
                             option.value = sender.id;
                             option.textContent = `${sender.name} (${sender.from_address})`;
+                            option.dataset.email = sender.from_address; // Store email for mapping
                             select.appendChild(option);
                         });
                         console.log('Loaded', data.senders.length, 'senders');
@@ -1529,6 +1755,21 @@
                     
                     const select = document.getElementById('senderSelect');
                     select.innerHTML = '<option value="">Error loading senders</option>';
+                }
+            }
+
+            // Auto-select SMTP configuration based on sender
+            autoSelectSmtpConfig(senderEmail) {
+                const smtpSelect = document.getElementById('smtpConfigSelect');
+                const options = smtpSelect.querySelectorAll('option');
+                
+                // Find matching SMTP configuration based on email
+                for (let option of options) {
+                    if (option.value && option.textContent.includes(senderEmail)) {
+                        smtpSelect.value = option.value;
+                        console.log('Auto-selected SMTP config:', option.textContent);
+                        break;
+                    }
                 }
             }
 
@@ -1624,25 +1865,54 @@
             }
 
             setupEventListeners() {
+                // Campaign form submission
                 document.getElementById('campaignForm').addEventListener('submit', (e) => {
                     e.preventDefault();
                     this.createCampaign();
                 });
 
-                document.getElementById('recipients').addEventListener('input', (e) => {
-                    this.validateEmails(e.target.value);
-                });
+                // Sender selection change event
+                const senderSelect = document.getElementById('senderSelect');
+                if (senderSelect) {
+                    senderSelect.addEventListener('change', (e) => {
+                        const selectedOption = e.target.options[e.target.selectedIndex];
+                        if (selectedOption.dataset.email) {
+                            this.autoSelectSmtpConfig(selectedOption.dataset.email);
+                        }
+                    });
+                }
 
-                // CSV file handling
-                document.getElementById('csvFile').addEventListener('change', (e) => {
-                    this.handleCsvFile(e.target.files[0]);
-                });
+                // Live dashboard event listeners
+                const refreshLiveStatsBtn = document.getElementById('refreshLiveStats');
+                if (refreshLiveStatsBtn) {
+                    refreshLiveStatsBtn.addEventListener('click', () => {
+                        this.refreshLiveStats();
+                    });
+                }
+            }
 
-                // Sample CSV download
-                document.getElementById('downloadSample').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.downloadSampleCsv();
-                });
+            // CSV file handling
+            handleCsvFile(file) {
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const csv = e.target.result;
+                    this.parseCsv(csv);
+                };
+                reader.readAsText(file);
+            }
+
+            // Sample CSV download
+            downloadSampleCsv() {
+                const csvContent = "email,name\njohn@example.com,John Doe\njane@example.com,Jane Smith";
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sample_recipients.csv';
+                a.click();
+                window.URL.revokeObjectURL(url);
             }
 
             validateEmails(emailText) {
@@ -1814,6 +2084,19 @@
                         // Convert CSV data to newline-separated string
                         const csvEmails = this.csvData.map(item => item.email).join('\n');
                         formData.set('recipients', csvEmails);
+                    } else {
+                        // Use manual entry if no CSV data
+                        const manualRecipients = document.getElementById('recipients').value;
+                        if (manualRecipients.trim()) {
+                            formData.set('recipients', manualRecipients);
+                        } else {
+                            this.showAlert('Please provide recipients either manually or via CSV upload', 'warning');
+                            // Re-enable form
+                            form.classList.remove('loading');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Create Campaign & Start Sending';
+                            return;
+                        }
                     }
 
                     const response = await fetch('/api/campaigns', {
@@ -1830,6 +2113,7 @@
                         this.currentCampaignId = data.campaign_id;
                         this.showAlert(`Campaign created successfully! ${data.total_recipients} emails queued.`, 'success');
                         this.showStatusCard();
+                        this.showLiveDashboard(data.campaign);
                         this.startPolling();
                         form.reset();
                         
@@ -1852,6 +2136,111 @@
 
             showStatusCard() {
                 document.getElementById('statusCard').style.display = 'block';
+            }
+
+            // Live Dashboard Methods
+            showLiveDashboard(campaign) {
+                const dashboard = document.getElementById('liveCampaignDashboard');
+                dashboard.style.display = 'block';
+                
+                // Update campaign info
+                document.getElementById('liveCampaignName').textContent = campaign.name || 'Unknown Campaign';
+                document.getElementById('liveCampaignStatus').textContent = campaign.status || 'Unknown';
+                document.getElementById('liveCampaignStatus').className = `badge bg-${this.getStatusColor(campaign.status)}`;
+                
+                // Initialize stats
+                this.updateLiveStats({
+                    total_recipients: campaign.total_recipients || 0,
+                    sent: 0,
+                    pending: campaign.total_recipients || 0,
+                    failed: 0
+                });
+                
+                // Add initial activity
+                this.addLiveActivity('Campaign created and queued for sending', 'info');
+            }
+
+            updateLiveStats(stats) {
+                document.getElementById('liveTotalRecipients').textContent = stats.total_recipients || 0;
+                document.getElementById('liveSentCount').textContent = stats.sent || 0;
+                document.getElementById('livePendingCount').textContent = stats.pending || 0;
+                document.getElementById('liveFailedCount').textContent = stats.failed || 0;
+                
+                // Calculate progress
+                const total = stats.total_recipients || 0;
+                const completed = stats.sent || 0;
+                const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+                
+                document.getElementById('liveProgressPercent').textContent = `${progress}%`;
+                document.getElementById('liveProgressBar').style.width = `${progress}%`;
+                
+                // Update progress bar color based on progress
+                const progressBar = document.getElementById('liveProgressBar');
+                if (progress === 100) {
+                    progressBar.className = 'progress-bar bg-success';
+                } else if (progress > 50) {
+                    progressBar.className = 'progress-bar bg-warning';
+                } else {
+                    progressBar.className = 'progress-bar bg-primary';
+                }
+            }
+
+            addLiveActivity(message, type = 'info') {
+                const activityFeed = document.getElementById('liveActivityFeed');
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                
+                const activityItem = document.createElement('div');
+                activityItem.className = 'activity-item';
+                
+                const iconClass = {
+                    'info': 'fas fa-info-circle text-primary',
+                    'success': 'fas fa-check-circle text-success',
+                    'warning': 'fas fa-exclamation-triangle text-warning',
+                    'danger': 'fas fa-times-circle text-danger',
+                    'sending': 'fas fa-paper-plane text-info'
+                }[type] || 'fas fa-info-circle text-primary';
+                
+                activityItem.innerHTML = `
+                    <div class="activity-icon bg-light">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="text-sm">${message}</div>
+                        <div class="activity-time">${timeString}</div>
+                    </div>
+                `;
+                
+                // Add to top of feed
+                if (activityFeed.children.length > 0) {
+                    activityFeed.insertBefore(activityItem, activityFeed.firstChild);
+                } else {
+                    activityFeed.innerHTML = '';
+                    activityFeed.appendChild(activityItem);
+                }
+                
+                // Limit to 10 items
+                while (activityFeed.children.length > 10) {
+                    activityFeed.removeChild(activityFeed.lastChild);
+                }
+            }
+
+            async refreshLiveStats() {
+                if (!this.currentCampaignId) return;
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${this.currentCampaignId}/status`, {
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.updateLiveStats(data.stats);
+                        this.addLiveActivity(`Stats refreshed - ${data.stats.sent} sent, ${data.stats.pending} pending`, 'info');
+                    }
+                } catch (error) {
+                    console.error('Error refreshing live stats:', error);
+                }
             }
 
             startPolling() {
@@ -1878,10 +2267,19 @@
 
                     if (data.success) {
                         this.updateStatusDisplay(data);
+                        this.updateLiveStats(data.stats);
                         
-                        // Stop polling if campaign is completed
+                        // Add activity based on status changes
+                        if (data.stats.sent > 0) {
+                            this.addLiveActivity(`${data.stats.sent} emails sent successfully`, 'success');
+                        }
+                        if (data.stats.failed > 0) {
+                            this.addLiveActivity(`${data.stats.failed} emails failed`, 'danger');
+                        }
+                        
                         if (data.campaign_status === 'completed') {
-                            this.stopPolling();
+                            this.addLiveActivity('Campaign completed successfully!', 'success');
+                            clearInterval(this.pollingInterval);
                         }
                     }
                 } catch (error) {

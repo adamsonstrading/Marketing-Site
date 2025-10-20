@@ -10,6 +10,7 @@ class Campaign extends Model
 {
     protected $fillable = [
         'sender_id',
+        'smtp_configuration_id',
         'name',
         'subject',
         'body',
@@ -27,6 +28,14 @@ class Campaign extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(Sender::class);
+    }
+
+    /**
+     * Get the SMTP configuration for the campaign.
+     */
+    public function smtpConfiguration(): BelongsTo
+    {
+        return $this->belongsTo(SmtpConfiguration::class);
     }
 
     /**

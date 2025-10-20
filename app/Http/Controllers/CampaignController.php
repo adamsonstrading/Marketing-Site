@@ -25,6 +25,7 @@ class CampaignController extends Controller
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
             'sender_id' => 'required|exists:senders,id',
+            'smtp_configuration_id' => 'required|exists:smtp_configurations,id',
             'recipients' => 'required|string|min:1',
         ]);
 
@@ -59,6 +60,7 @@ class CampaignController extends Controller
             // Create campaign
             $campaign = Campaign::create([
                 'sender_id' => $request->sender_id,
+                'smtp_configuration_id' => $request->smtp_configuration_id,
                 'name' => $request->name,
                 'subject' => $request->subject,
                 'body' => $request->body,
@@ -275,21 +277,22 @@ class CampaignController extends Controller
                 ->toArray();
             
             // Get recent campaigns
-            $recentCampaigns = Campaign::with('sender')
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($campaign) {
-                    return [
-                        'id' => $campaign->id,
-                        'name' => $campaign->name,
-                        'subject' => $campaign->subject,
-                        'status' => $campaign->status,
-                        'total_recipients' => $campaign->total_recipients,
-                        'created_at' => $campaign->created_at->format('M d, Y H:i'),
-                        'sender_name' => $campaign->sender->name ?? 'Unknown'
-                    ];
-                });
+                $recentCampaigns = Campaign::with(['sender', 'smtpConfiguration'])
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($campaign) {
+                        return [
+                            'id' => $campaign->id,
+                            'name' => $campaign->name,
+                            'subject' => $campaign->subject,
+                            'status' => $campaign->status,
+                            'total_recipients' => $campaign->total_recipients,
+                            'created_at' => $campaign->created_at->format('M d, Y H:i'),
+                            'sender_name' => $campaign->sender->name ?? 'Unknown',
+                            'smtp_configuration_name' => $campaign->smtpConfiguration->name ?? 'Unknown'
+                        ];
+                    });
 
             // Calculate overall progress (completed campaigns)
             $completedCampaigns = $statusCounts['completed'] ?? 0;

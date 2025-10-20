@@ -13,56 +13,33 @@ class SenderSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create Business Loans 4U sender
+        // Clear existing senders
+        Sender::query()->delete();
+
+        // Finda Property Marketing Sender
         Sender::create([
-            'name' => 'Business Loans 4U',
-            'email' => 'info@businessloans4u.co.uk',
+            'name' => 'Finda Property Marketing',
+            'email' => 'marketing@findaproperty.io',
             'smtp_host' => 'smtp.ionos.co.uk',
             'smtp_port' => 587,
-            'smtp_username' => 'info@businessloans4u.co.uk',
+            'smtp_username' => 'marketing@findaproperty.io',
             'smtp_password' => 'Adamsons@514',
             'smtp_encryption' => 'tls',
-            'from_name' => 'Business Loans 4U',
-            'from_address' => 'info@businessloans4u.co.uk',
+            'from_name' => 'Finda Property Marketing',
+            'from_address' => 'marketing@findaproperty.io',
         ]);
 
-        // Create Finda Property sender
+        // Business Loan 4U Marketing Sender
         Sender::create([
-            'name' => 'Finda Property',
-            'email' => 'no-reply@findaproperty.io',
+            'name' => 'Business Loan 4U Marketing',
+            'email' => 'marketing@businessloan4u.co.uk',
             'smtp_host' => 'smtp.ionos.co.uk',
             'smtp_port' => 587,
-            'smtp_username' => 'no-reply@findaproperty.io',
+            'smtp_username' => 'marketing@businessloan4u.co.uk',
             'smtp_password' => 'Adamsons@514',
             'smtp_encryption' => 'tls',
-            'from_name' => 'Finda Property',
-            'from_address' => 'no-reply@findaproperty.io',
-        ]);
-
-        // Create a sample SendGrid sender
-        Sender::create([
-            'name' => 'SendGrid Sender',
-            'email' => 'noreply@yourdomain.com',
-            'smtp_host' => 'smtp.sendgrid.net',
-            'smtp_port' => 587,
-            'smtp_username' => 'apikey',
-            'smtp_password' => 'YOUR_SENDGRID_API_KEY_HERE', // Replace with actual API key
-            'smtp_encryption' => 'tls',
-            'from_name' => 'Your Company',
-            'from_address' => 'noreply@yourdomain.com',
-        ]);
-
-        // Create a sample Mailtrap sender for testing
-        Sender::create([
-            'name' => 'Mailtrap Test Sender',
-            'email' => 'test@example.com',
-            'smtp_host' => 'sandbox.smtp.mailtrap.io',
-            'smtp_port' => 2525,
-            'smtp_username' => 'your_mailtrap_username',
-            'smtp_password' => 'your_mailtrap_password',
-            'smtp_encryption' => 'tls',
-            'from_name' => 'Test Sender',
-            'from_address' => 'test@example.com',
+            'from_name' => 'Business Loan 4U Marketing',
+            'from_address' => 'marketing@businessloan4u.co.uk',
         ]);
     }
 }
