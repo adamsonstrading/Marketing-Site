@@ -32,14 +32,14 @@ class SenderSeeder extends Seeder
         // Business Loan 4U Marketing Sender
         Sender::create([
             'name' => 'Business Loan 4U Marketing',
-            'email' => 'marketing@businessloan4u.co.uk',
+            'email' => 'marketing@businessloans4u.co.uk',
             'smtp_host' => 'smtp.ionos.co.uk',
             'smtp_port' => 587,
-            'smtp_username' => 'marketing@businessloan4u.co.uk',
+            'smtp_username' => 'marketing@businessloans4u.co.uk',
             'smtp_password' => 'Adamsons@514',
             'smtp_encryption' => 'tls',
             'from_name' => 'Business Loan 4U Marketing',
-            'from_address' => 'marketing@businessloan4u.co.uk',
+            'from_address' => 'marketing@businessloans4u.co.uk',
         ]);
     }
 }

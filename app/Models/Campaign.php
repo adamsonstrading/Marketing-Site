@@ -11,6 +11,7 @@ class Campaign extends Model
     protected $fillable = [
         'sender_id',
         'smtp_configuration_id',
+        'template_id',
         'name',
         'subject',
         'body',

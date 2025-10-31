@@ -13,49 +13,19 @@ class SmtpConfigurationSeeder extends Seeder
      */
     public function run(): void
     {
-        // Finda Property Marketing SMTP Configuration
-        SmtpConfiguration::create([
-            'name' => 'Finda Property Marketing',
-            'host' => 'smtp.ionos.co.uk',
-            'port' => 587,
-            'username' => 'marketing@findaproperty.io',
-            'password' => 'Adamsons@514',
-            'from_address' => 'marketing@findaproperty.io',
-            'from_name' => 'Finda Property Marketing',
-            'encryption' => 'tls',
-            'is_active' => true,
-            'is_default' => true,
-            'description' => 'SMTP configuration for Finda Property marketing emails'
-        ]);
-
-        // Business Loan 4U Marketing SMTP Configuration
+        // Business Loan 4U Marketing SMTP Configuration (IONOS)
         SmtpConfiguration::create([
             'name' => 'Business Loan 4U Marketing',
             'host' => 'smtp.ionos.co.uk',
             'port' => 587,
-            'username' => 'marketing@businessloan4u.co.uk',
+            'username' => 'marketing@businessloans4u.co.uk',
             'password' => 'Adamsons@514',
-            'from_address' => 'marketing@businessloan4u.co.uk',
+            'from_address' => 'marketing@businessloans4u.co.uk',
             'from_name' => 'Business Loan 4U Marketing',
             'encryption' => 'tls',
             'is_active' => true,
-            'is_default' => false,
-            'description' => 'SMTP configuration for Business Loan 4U marketing emails'
-        ]);
-
-        // Default SMTP Configuration (for testing)
-        SmtpConfiguration::create([
-            'name' => 'Default SMTP',
-            'host' => 'smtp.mailtrap.io',
-            'port' => 2525,
-            'username' => 'your_username',
-            'password' => 'your_password',
-            'from_address' => 'test@example.com',
-            'from_name' => 'Email Agent Test',
-            'encryption' => 'tls',
-            'is_active' => false,
-            'is_default' => false,
-            'description' => 'Default SMTP configuration for testing purposes'
+            'is_default' => true,
+            'description' => 'SMTP configuration for Business Loan 4U marketing emails via IONOS'
         ]);
     }
 }
