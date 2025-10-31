@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 
 class CampaignController extends Controller
@@ -26,6 +27,7 @@ class CampaignController extends Controller
             'body' => 'required|string',
             'sender_id' => 'required|exists:senders,id',
             'smtp_configuration_id' => 'required|exists:smtp_configurations,id',
+            'template_id' => 'nullable|exists:email_templates,id',
             'recipients' => 'required|string|min:1',
         ]);
 
@@ -61,6 +63,7 @@ class CampaignController extends Controller
             $campaign = Campaign::create([
                 'sender_id' => $request->sender_id,
                 'smtp_configuration_id' => $request->smtp_configuration_id,
+                'template_id' => $request->template_id ?? null,
                 'name' => $request->name,
                 'subject' => $request->subject,
                 'body' => $request->body,
@@ -346,5 +349,83 @@ class CampaignController extends Controller
         
         $result[] = $current;
         return $result;
+    }
+
+    /**
+     * Proxy request to n8n webhook (server-side to avoid CORS)
+     */
+    public function sendToN8n(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'sender_id' => 'required',
+            'sender_name' => 'nullable|string',
+            'sender_email' => 'nullable|string|email',
+            'subject' => 'required|string',
+            'message' => 'required|string',
+            'recipients' => 'required|string',
+            'smtp_configuration_id' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $webhookUrl = 'https://humayounai.app.n8n.cloud/webhook-test/mail';
+            
+            $data = [
+                'sender_id' => $request->sender_id,
+                'sender_name' => $request->sender_name,
+                'sender_email' => $request->sender_email,
+                'subject' => $request->subject,
+                'message' => $request->message,
+                'recipients' => $request->recipients,
+                'smtp_configuration_id' => $request->smtp_configuration_id,
+            ];
+
+            $response = Http::timeout(30)->post($webhookUrl, $data);
+
+            $statusCode = $response->status();
+
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data sent to n8n successfully',
+                    'status' => $statusCode,
+                    'response' => $response->json() ?? $response->body()
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'n8n webhook returned an error',
+                    'status' => $statusCode,
+                    'response' => $response->body()
+                ], $statusCode);
+            }
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            \Log::error('N8n webhook connection error', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to connect to n8n webhook. Please check the webhook URL and network connection.'
+            ], 500);
+        } catch (\Exception $e) {
+            \Log::error('N8n webhook exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

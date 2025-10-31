@@ -8,7 +8,7 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return view('campaign');
+    return redirect()->route('campaign');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware(['throttle:5,1'])->group(function () {
             Route::post('/campaigns', [App\Http\Controllers\CampaignController::class, 'store']);
             Route::post('/senders', [App\Http\Controllers\CampaignController::class, 'createSender']);
+            Route::post('/n8n-webhook', [App\Http\Controllers\CampaignController::class, 'sendToN8n']);
         });
 
         // Status and sender listing routes (less restrictive)
@@ -34,6 +35,11 @@ Route::middleware('auth')->group(function () {
             Route::get('/campaigns/{id}/status', [App\Http\Controllers\CampaignController::class, 'status']);
             Route::get('/senders', [App\Http\Controllers\CampaignController::class, 'senders']);
             Route::get('/dashboard', [App\Http\Controllers\CampaignController::class, 'dashboard']);
+            
+            // Email Templates routes
+            Route::get('/email-templates', [App\Http\Controllers\EmailTemplateController::class, 'index']);
+            Route::get('/email-templates/active', [App\Http\Controllers\EmailTemplateController::class, 'active']);
+            Route::get('/email-templates/{id}', [App\Http\Controllers\EmailTemplateController::class, 'show']);
             
             // SMTP Configuration routes
             Route::get('/smtp-configurations', [App\Http\Controllers\SmtpConfigurationController::class, 'index']);
