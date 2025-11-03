@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\CampaignMail;
 use App\Models\Recipient;
+use App\Services\SmtpRotationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -11,8 +12,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Exception;
-use Symfony\Component\Mime\Email;
-use Symfony\Component\Mime\Address;
 
 class SendRecipientJob implements ShouldQueue
 {
@@ -20,6 +19,9 @@ class SendRecipientJob implements ShouldQueue
 
     public int $tries = 3;
     public int $timeout = 60;
+    
+    // Add delay between emails to prevent rate limiting (2 seconds default)
+    public int $backoff = 2;
 
     /**
      * Create a new job instance.
@@ -27,7 +29,8 @@ class SendRecipientJob implements ShouldQueue
     public function __construct(
         public int $recipientId
     ) {
-        //
+        // Add small random delay to prevent sending too fast
+        $this->delay(now()->addSeconds(rand(1, 3)));
     }
 
     /**
@@ -36,62 +39,185 @@ class SendRecipientJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $recipient = Recipient::with(['campaign.sender'])->findOrFail($this->recipientId);
+            $recipient = Recipient::with(['campaign.smtpConfiguration', 'campaign.sender'])->findOrFail($this->recipientId);
             $campaign = $recipient->campaign;
-            $sender = $campaign->sender;
 
             Log::info("Processing recipient {$this->recipientId} for campaign {$campaign->id}");
 
-            // Decrypt the SMTP password
-            $smtpPassword = decrypt($sender->getRawOriginal('smtp_password'));
+            // Check if email is blacklisted
+            if (\App\Models\Blacklist::isBlacklisted($recipient->email)) {
+                Log::info("Recipient {$recipient->email} is blacklisted, skipping");
+                $recipient->update([
+                    'status' => 'failed',
+                    'last_error' => 'Email address is blacklisted',
+                ]);
+                $this->recomputeCampaignStatus($campaign->id);
+                return;
+            }
 
-            // Override mail configuration for this sender
-            config([
-                'mail.mailers.smtp.host' => $sender->smtp_host,
-                'mail.mailers.smtp.port' => $sender->smtp_port,
-                'mail.mailers.smtp.username' => $sender->smtp_username,
-                'mail.mailers.smtp.password' => $smtpPassword,
-                'mail.mailers.smtp.encryption' => $sender->smtp_encryption ?? 'tls',
-                'mail.from.address' => $sender->from_address,
-                'mail.from.name' => $sender->from_name,
-            ]);
+            // Use SMTP rotation service for better load balancing
+            $smtpRotationService = app(SmtpRotationService::class);
+            $smtpConfig = null;
+
+            // Use SMTP configuration if available, otherwise fallback to sender or rotation
+            if ($campaign->smtp_configuration_id && $campaign->smtpConfiguration) {
+                $smtpConfig = $campaign->smtpConfiguration;
+                
+                // Check if this SMTP can be used (not at limit)
+                if (!$smtpRotationService->canUse($smtpConfig)) {
+                    Log::warning("SMTP {$smtpConfig->id} is at limit, trying rotation");
+                    // Try to get another SMTP via rotation
+                    $smtpConfig = $smtpRotationService->getNextSmtp();
+                    if (!$smtpConfig) {
+                        throw new \Exception("No available SMTP configurations");
+                    }
+                }
+            } elseif (!$campaign->sender_id || !$campaign->sender) {
+                // No SMTP or sender specified, use rotation
+                $smtpConfig = $smtpRotationService->getNextSmtp();
+                if ($smtpConfig) {
+                    Log::info("Using rotated SMTP: {$smtpConfig->name} (ID: {$smtpConfig->id})");
+                }
+            }
+
+            if ($smtpConfig) {
+                
+                // Get decrypted password
+                $smtpPassword = $smtpConfig->password; // Already decrypted via accessor
+                
+                // Use SMTP configuration
+                config([
+                    'mail.mailers.smtp.host' => $smtpConfig->host,
+                    'mail.mailers.smtp.port' => $smtpConfig->port,
+                    'mail.mailers.smtp.username' => $smtpConfig->username,
+                    'mail.mailers.smtp.password' => $smtpPassword,
+                    'mail.mailers.smtp.encryption' => $smtpConfig->encryption ?? 'tls',
+                    'mail.from.address' => $smtpConfig->from_address,
+                    'mail.from.name' => $smtpConfig->from_name,
+                ]);
+
+                $fromAddress = $smtpConfig->from_address;
+                $fromName = $smtpConfig->from_name;
+                $smtpHost = $smtpConfig->host;
+                $smtpPort = $smtpConfig->port;
+                $smtpUsername = $smtpConfig->username;
+                $encryption = $smtpConfig->encryption ?? 'tls';
+                
+                Log::info("Using SMTP Configuration:", [
+                    'host' => $smtpHost,
+                    'port' => $smtpPort,
+                    'username' => $smtpUsername,
+                    'password_length' => strlen($smtpPassword),
+                    'encryption' => $encryption,
+                    'from_address' => $fromAddress,
+                    'from_name' => $fromName,
+                ]);
+            } elseif ($campaign->sender_id && $campaign->sender) {
+                // Fallback to sender (legacy support)
+                $sender = $campaign->sender;
+                
+                // Decrypt the SMTP password
+                $smtpPassword = decrypt($sender->getRawOriginal('smtp_password'));
+
+                config([
+                    'mail.mailers.smtp.host' => $sender->smtp_host,
+                    'mail.mailers.smtp.port' => $sender->smtp_port,
+                    'mail.mailers.smtp.username' => $sender->smtp_username,
+                    'mail.mailers.smtp.password' => $smtpPassword,
+                    'mail.mailers.smtp.encryption' => $sender->smtp_encryption ?? 'tls',
+                    'mail.from.address' => $sender->from_address,
+                    'mail.from.name' => $sender->from_name,
+                ]);
+
+                $fromAddress = $sender->from_address;
+                $fromName = $sender->from_name;
+                $smtpHost = $sender->smtp_host;
+                $smtpPort = $sender->smtp_port;
+                $smtpUsername = $sender->smtp_username;
+                $encryption = $sender->smtp_encryption ?? 'tls';
+                
+                Log::info("Using Sender (legacy):", [
+                    'host' => $smtpHost,
+                    'port' => $smtpPort,
+                    'username' => $smtpUsername,
+                    'password_length' => strlen($smtpPassword),
+                    'encryption' => $encryption,
+                    'from_address' => $fromAddress,
+                    'from_name' => $fromName,
+                ]);
+            } else {
+                throw new \Exception("Campaign {$campaign->id} has no SMTP configuration or sender");
+            }
 
             // Clear mail manager cache to ensure new config is used
             app('mail.manager')->forgetMailers();
 
-            // Log the configuration being used
-            Log::info("Using SMTP configuration:", [
-                'host' => $sender->smtp_host,
-                'port' => $sender->smtp_port,
-                'username' => $sender->smtp_username,
-                'password_length' => strlen($smtpPassword),
-                'encryption' => $sender->smtp_encryption ?? 'tls',
-                'from_address' => $sender->from_address,
-                'from_name' => $sender->from_name,
-            ]);
+            // Check if campaign is paused
+            if ($campaign->status === 'paused') {
+                Log::info("Campaign {$campaign->id} is paused, skipping recipient {$this->recipientId}");
+                return; // Don't send, but don't mark as failed
+            }
 
-            // Send the email
-            Mail::mailer('smtp')
-                ->to($recipient->email)
-                ->bcc($sender->from_address) // ensure a copy lands in sender's mailbox
-                ->send(new CampaignMail($campaign->subject, $campaign->body));
+            // Add small delay between emails to prevent rate limiting
+            // This helps avoid being blocked by SMTP servers during bulk sending
+            usleep(2000000); // 2 seconds delay (2000000 microseconds)
 
-            // IMAP append disabled (using BCC-to-sender instead)
+            // Prepare dynamic variables for email template
+            $firstName = '';
+            $lastName = '';
+            if ($recipient->name) {
+                $nameParts = explode(' ', trim($recipient->name), 2);
+                $firstName = $nameParts[0] ?? '';
+                $lastName = $nameParts[1] ?? '';
+            }
 
-            // Update recipient status on success
-            $recipient->update([
-                'status' => 'sent',
-                'sent_at' => now(),
-                'last_error' => null,
-            ]);
+            $variables = [
+                'name' => $recipient->name ?? $recipient->email,
+                'email' => $recipient->email,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'campaign_name' => $campaign->name,
+                'sender_name' => $fromName,
+            ];
 
-            // Recompute and persist campaign aggregate status for dashboards
-            $this->recomputeCampaignStatus($campaign->id);
+            // Send the email with dynamic variables
+            try {
+                Mail::mailer('smtp')
+                    ->to($recipient->email)
+                    ->bcc($fromAddress) // ensure a copy lands in sender's mailbox
+                    ->send(new CampaignMail($campaign->subject, $campaign->body, $variables));
 
-            Log::info("Successfully sent email to {$recipient->email}");
+                // Record success for SMTP rotation
+                if ($smtpConfig) {
+                    $smtpRotationService->recordSuccess($smtpConfig);
+                }
+
+                // Update recipient status on success
+                $recipient->update([
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'last_error' => null,
+                ]);
+
+                // Recompute and persist campaign aggregate status for dashboards
+                $this->recomputeCampaignStatus($campaign->id);
+
+                Log::info("Successfully sent email to {$recipient->email}");
+            } catch (Exception $mailException) {
+                // Record failure for SMTP rotation
+                if ($smtpConfig) {
+                    $smtpRotationService->recordFailure($smtpConfig);
+                }
+                throw $mailException;
+            }
 
         } catch (Exception $e) {
             Log::error("Failed to send email to recipient {$this->recipientId}: " . $e->getMessage());
+
+            // Record failure for SMTP rotation if SMTP config was used
+            if (isset($smtpConfig) && $smtpConfig && isset($smtpRotationService)) {
+                $smtpRotationService->recordFailure($smtpConfig);
+            }
 
             $recipient = Recipient::find($this->recipientId);
             if ($recipient) {
@@ -111,7 +237,7 @@ class SendRecipientJob implements ShouldQueue
                         'last_error' => $e->getMessage(),
                     ]);
                     
-                    // Re-dispatch with delay for retry
+                    // Re-dispatch with exponential backoff delay
                     $delay = pow(2, $recipient->attempt_count) * 60; // Exponential backoff in minutes
                     Log::info("Re-dispatching recipient {$this->recipientId} with {$delay} minute delay");
                     
@@ -120,63 +246,6 @@ class SendRecipientJob implements ShouldQueue
             }
 
             throw $e; // Re-throw to mark job as failed
-        }
-    }
-
-    /**
-     * Append the recently sent message to the sender's IMAP Sent folder.
-     * Tries common Sent folder names for IONOS.
-     */
-    private function appendMessageToSentFolder(
-        string $smtpUsername,
-        string $smtpPassword,
-        string $fromAddress,
-        string $fromName,
-        string $toAddress,
-        string $subject,
-        string $htmlBody
-    ): void {
-        try {
-            if (!function_exists('imap_open')) {
-                Log::warning('IMAP PHP extension not available; skipping append to Sent.');
-                return;
-            }
-
-            // Build raw RFC822 message via Symfony Mime
-            $email = (new Email())
-                ->from(new Address($fromAddress, $fromName))
-                ->to($toAddress)
-                ->subject($subject)
-                ->html($htmlBody);
-
-            // RFC822 formatted message
-            $rawMessage = $email->toString();
-
-            // Common IONOS Sent folder paths
-            $sentMailboxes = [
-                '{imap.ionos.co.uk:993/imap/ssl}Sent',
-                '{imap.ionos.co.uk:993/imap/ssl}INBOX.Sent',
-                '{imap.ionos.co.uk:993/imap/ssl}Sent Items',
-            ];
-
-            foreach ($sentMailboxes as $mailboxPath) {
-                $mbox = @imap_open($mailboxPath, $smtpUsername, $smtpPassword);
-                if ($mbox === false) {
-                    continue; // try next mailbox
-                }
-
-                $ok = @imap_append($mbox, $mailboxPath, $rawMessage);
-                @imap_close($mbox);
-
-                if ($ok) {
-                    Log::info("Appended sent message to IMAP folder: {$mailboxPath}");
-                    return;
-                }
-            }
-
-            Log::warning('Failed to append message to any IMAP Sent folder.');
-        } catch (Exception $e) {
-            Log::warning('IMAP append to Sent failed: ' . $e->getMessage());
         }
     }
 

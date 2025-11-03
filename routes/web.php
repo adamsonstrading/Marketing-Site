@@ -11,6 +11,11 @@ Route::get('/dashboard', function () {
     return redirect()->route('campaign');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+// Unsubscribe routes (public)
+Route::get('/unsubscribe', [App\Http\Controllers\UnsubscribeController::class, 'index'])->name('unsubscribe');
+Route::post('/unsubscribe', [App\Http\Controllers\UnsubscribeController::class, 'unsubscribe'])->name('unsubscribe.process');
+Route::get('/unsubscribe/success', [App\Http\Controllers\UnsubscribeController::class, 'success'])->name('unsubscribe.success');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -24,7 +29,7 @@ Route::middleware('auth')->group(function () {
     // API Routes for Email Agent (using web authentication)
     Route::prefix('api')->group(function () {
         // Campaign routes with rate limiting
-        Route::middleware(['throttle:5,1'])->group(function () {
+        Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/campaigns', [App\Http\Controllers\CampaignController::class, 'store']);
             Route::post('/senders', [App\Http\Controllers\CampaignController::class, 'createSender']);
             Route::post('/n8n-webhook', [App\Http\Controllers\CampaignController::class, 'sendToN8n']);
@@ -48,6 +53,18 @@ Route::middleware('auth')->group(function () {
             Route::post('/smtp-configurations/{id}/set-default', [App\Http\Controllers\SmtpConfigurationController::class, 'setDefault']);
             Route::post('/smtp-configurations/{id}/toggle-active', [App\Http\Controllers\SmtpConfigurationController::class, 'toggleActive']);
             Route::post('/smtp-configurations/{id}/test', [App\Http\Controllers\SmtpConfigurationController::class, 'test']);
+            
+            // Campaign control routes
+            Route::post('/campaigns/{id}/pause', [App\Http\Controllers\CampaignController::class, 'pause']);
+            Route::post('/campaigns/{id}/resume', [App\Http\Controllers\CampaignController::class, 'resume']);
+            
+            // Blacklist routes
+            Route::get('/blacklist', [App\Http\Controllers\BlacklistController::class, 'index']);
+            Route::post('/blacklist/email', [App\Http\Controllers\BlacklistController::class, 'addEmail']);
+            Route::post('/blacklist/domain', [App\Http\Controllers\BlacklistController::class, 'addDomain']);
+            Route::post('/blacklist/bulk', [App\Http\Controllers\BlacklistController::class, 'bulkAdd']);
+            Route::get('/blacklist/check/{email}', [App\Http\Controllers\BlacklistController::class, 'check']);
+            Route::delete('/blacklist/{id}', [App\Http\Controllers\BlacklistController::class, 'destroy']);
         });
         
         // SMTP Configuration management routes (more restrictive)
