@@ -7,6 +7,9 @@ use App\Jobs\SendRecipientJob;
 use App\Models\Campaign;
 use App\Models\Recipient;
 use App\Models\Sender;
+use App\Models\EmailTemplate;
+use App\Services\EmailVerificationService;
+use App\Services\SmtpRotationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -59,26 +62,79 @@ class CampaignController extends Controller
                 ], 422);
             }
 
+            // Use SMTP rotation if no specific SMTP is selected
+            $smtpRotationService = app(SmtpRotationService::class);
+            $smtpConfigurationId = $request->smtp_configuration_id;
+            
+            if (!$smtpConfigurationId) {
+                // Use rotation to get best SMTP
+                $rotatedSmtp = $smtpRotationService->getNextSmtp();
+                if ($rotatedSmtp) {
+                    $smtpConfigurationId = $rotatedSmtp->id;
+                    Log::info("Using rotated SMTP: {$rotatedSmtp->name} (ID: {$rotatedSmtp->id})");
+                }
+            }
+
+            // Verify emails if verification is enabled
+            $verificationService = app(EmailVerificationService::class);
+            $verifiedRecipients = [];
+            $verificationStats = [
+                'total' => count($recipientData),
+                'valid' => 0,
+                'invalid' => 0,
+                'disposable' => 0
+            ];
+
+            foreach ($recipientData as $recipient) {
+                $verification = $verificationService->verify($recipient['email']);
+                
+                $verifiedRecipients[] = [
+                    'email' => $recipient['email'],
+                    'name' => $recipient['name'] ?? null,
+                    'is_verified' => $verification['is_valid'],
+                    'is_disposable' => $verification['is_disposable'],
+                    'is_role_based' => $verification['is_role_based'],
+                    'has_mx_record' => $verification['has_mx_record'],
+                    'verification_details' => json_encode($verification['details'] ?? []),
+                    'verification_result' => $verification
+                ];
+
+                if ($verification['is_valid']) {
+                    $verificationStats['valid']++;
+                } else {
+                    $verificationStats['invalid']++;
+                }
+                
+                if ($verification['is_disposable']) {
+                    $verificationStats['disposable']++;
+                }
+            }
+
             // Create campaign
             $campaign = Campaign::create([
                 'sender_id' => $request->sender_id,
-                'smtp_configuration_id' => $request->smtp_configuration_id,
+                'smtp_configuration_id' => $smtpConfigurationId,
                 'template_id' => $request->template_id ?? null,
                 'name' => $request->name,
                 'subject' => $request->subject,
                 'body' => $request->body,
-                'total_recipients' => count($recipientData),
+                'total_recipients' => count($verifiedRecipients),
                 'status' => 'queued',
             ]);
 
-            // Create recipient records
+            // Create recipient records with verification data
             $recipients = [];
-            foreach ($recipientData as $recipient) {
+            foreach ($verifiedRecipients as $recipient) {
                 $recipients[] = [
                     'campaign_id' => $campaign->id,
                     'email' => $recipient['email'],
                     'name' => $recipient['name'] ?? null,
                     'status' => 'pending',
+                    'is_verified' => $recipient['is_verified'],
+                    'is_disposable' => $recipient['is_disposable'],
+                    'is_role_based' => $recipient['is_role_based'],
+                    'has_mx_record' => $recipient['has_mx_record'],
+                    'verification_details' => $recipient['verification_details'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -101,6 +157,7 @@ class CampaignController extends Controller
                 'success' => true,
                 'campaign_id' => $campaign->id,
                 'total_recipients' => $campaign->total_recipients,
+                'verification_stats' => $verificationStats,
                 'message' => 'Campaign created and jobs dispatched successfully'
             ]);
 
@@ -110,6 +167,83 @@ class CampaignController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create campaign: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Pause a campaign
+     */
+    public function pause(string $id): JsonResponse
+    {
+        try {
+            $campaign = Campaign::findOrFail($id);
+            
+            if (!in_array($campaign->status, ['queued', 'sending'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Campaign can only be paused if it is queued or sending'
+                ], 400);
+            }
+
+            $campaign->update(['status' => 'paused']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Campaign paused successfully',
+                'campaign' => $campaign
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to pause campaign: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Resume a paused campaign
+     */
+    public function resume(string $id): JsonResponse
+    {
+        try {
+            $campaign = Campaign::findOrFail($id);
+            
+            if ($campaign->status !== 'paused') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Campaign is not paused'
+                ], 400);
+            }
+
+            // Get pending recipients count
+            $pendingCount = $campaign->recipients()->where('status', 'pending')->count();
+            
+            if ($pendingCount > 0) {
+                $campaign->update(['status' => 'sending']);
+                
+                // Re-dispatch jobs for pending recipients
+                $pendingRecipientIds = $campaign->recipients()
+                    ->where('status', 'pending')
+                    ->pluck('id')
+                    ->toArray();
+
+                foreach ($pendingRecipientIds as $recipientId) {
+                    SendRecipientJob::dispatch($recipientId)->onQueue('emails');
+                }
+            } else {
+                $campaign->update(['status' => 'completed']);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Campaign resumed successfully',
+                'campaign' => $campaign
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to resume campaign: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -279,6 +413,12 @@ class CampaignController extends Controller
                 ->pluck('count', 'status')
                 ->toArray();
             
+            // Get aggregate recipient statistics across all campaigns
+            $recipientStats = \App\Models\Recipient::select('status', DB::raw('count(*) as count'))
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+            
             // Get recent campaigns
                 $recentCampaigns = Campaign::with(['sender', 'smtpConfiguration'])
                     ->orderBy('created_at', 'desc')
@@ -300,6 +440,11 @@ class CampaignController extends Controller
             // Calculate overall progress (completed campaigns)
             $completedCampaigns = $statusCounts['completed'] ?? 0;
             $overallProgress = $totalCampaigns > 0 ? round(($completedCampaigns / $totalCampaigns) * 100) : 0;
+            
+            // Calculate sidebar progress (recipients sent/failed vs total)
+            $sentRecipients = $recipientStats['sent'] ?? 0;
+            $failedRecipients = $recipientStats['failed'] ?? 0;
+            $sidebarProgress = $totalRecipients > 0 ? round((($sentRecipients + $failedRecipients) / $totalRecipients) * 100) : 0;
 
             return response()->json([
                 'success' => true,
@@ -313,7 +458,14 @@ class CampaignController extends Controller
                         'draft' => $statusCounts['draft'] ?? 0,
                         'failed' => $statusCounts['failed'] ?? 0
                     ],
+                    'recipient_stats' => [
+                        'total' => $totalRecipients,
+                        'sent' => $recipientStats['sent'] ?? 0,
+                        'pending' => $recipientStats['pending'] ?? 0,
+                        'failed' => $recipientStats['failed'] ?? 0
+                    ],
                     'overall_progress' => $overallProgress,
+                    'sidebar_progress' => $sidebarProgress,
                     'recent_campaigns' => $recentCampaigns
                 ]
             ]);

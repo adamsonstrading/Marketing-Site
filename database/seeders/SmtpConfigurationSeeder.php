@@ -27,5 +27,20 @@ class SmtpConfigurationSeeder extends Seeder
             'is_default' => true,
             'description' => 'SMTP configuration for Business Loan 4U marketing emails via IONOS'
         ]);
+
+        // Finda Property Marketing SMTP Configuration (IONOS)
+        SmtpConfiguration::create([
+            'name' => 'Finda Property Marketing',
+            'host' => 'smtp.ionos.co.uk',
+            'port' => 587,
+            'username' => 'marketing@findaproperty.io',
+            'password' => 'Adamsons@514',
+            'from_address' => 'marketing@findaproperty.io',
+            'from_name' => 'Finda Property Marketing',
+            'encryption' => 'tls',
+            'is_active' => true,
+            'is_default' => false,
+            'description' => 'SMTP configuration for Finda Property marketing emails via IONOS'
+        ]);
     }
 }

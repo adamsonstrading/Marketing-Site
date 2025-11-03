@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Email Agent</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -1437,19 +1439,19 @@
                                 <!-- Status Metrics -->
                                 <div class="status-grid">
                                     <div class="status-card">
-                                        <div class="status-number" id="totalCount">0</div>
+                                        <div class="status-number" id="sidebarTotalCount">0</div>
                                         <div class="status-label">Total</div>
                                     </div>
                                     <div class="status-card">
-                                        <div class="status-number" id="sentCount">0</div>
+                                        <div class="status-number" id="sidebarSentCount">0</div>
                                         <div class="status-label">Sent</div>
                                     </div>
                                     <div class="status-card">
-                                        <div class="status-number" id="pendingCount">0</div>
+                                        <div class="status-number" id="sidebarPendingCount">0</div>
                                         <div class="status-label">Pending</div>
                                     </div>
                                     <div class="status-card">
-                                        <div class="status-number" id="failedCount">0</div>
+                                        <div class="status-number" id="sidebarFailedCount">0</div>
                                         <div class="status-label">Failed</div>
                                     </div>
                                 </div>
@@ -1458,20 +1460,28 @@
                                 <div class="progress-ring">
                                     <svg>
                                         <defs>
-                                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <linearGradient id="sidebarGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                                                 <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
                                                 <stop offset="100%" style="stop-color:#0099cc;stop-opacity:1" />
                                             </linearGradient>
                                         </defs>
                                         <circle class="progress-ring-circle progress-ring-bg" cx="60" cy="60" r="52"></circle>
                                         <circle class="progress-ring-circle progress-ring-progress" cx="60" cy="60" r="52" 
-                                                stroke-dasharray="326.73" stroke-dashoffset="326.73" id="progressRing"></circle>
+                                                stroke-dasharray="326.73" stroke-dashoffset="326.73" id="sidebarProgressRing"></circle>
                                     </svg>
-                                    <div class="progress-text" id="progressPercent">0%</div>
+                                    <div class="progress-text" id="sidebarProgressPercent">0%</div>
                                 </div>
 
                                 <div class="mb-3 text-center">
-                                    <small class="text-muted">Campaign Status: <span id="campaignStatus" class="badge bg-secondary">Unknown</span></small>
+                                    <small class="text-muted">Campaign Status: <span id="sidebarCampaignStatus" class="badge bg-secondary">Unknown</span></small>
+                                    <div class="mt-2" id="pauseResumeButtons" style="display: none;">
+                                        <button type="button" class="btn btn-sm btn-warning me-1" id="pauseCampaignBtn" onclick="window.campaignManager?.pauseCampaign()">
+                                            <i class="fas fa-pause"></i> Pause
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-success" id="resumeCampaignBtn" onclick="window.campaignManager?.resumeCampaign()" style="display: none;">
+                                            <i class="fas fa-play"></i> Resume
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="recipient-table">
@@ -1722,6 +1732,8 @@
                 this.loadEmailTemplates();
                 this.setupEventListeners();
                 this.loadDashboardData();
+                this.loadSidebarStats();
+                this.startSidebarPolling();
             }
 
             getAuthToken() {
@@ -2006,6 +2018,300 @@
                     'failed': 'danger'
                 };
                 return colors[status] || 'secondary';
+            }
+            
+            async loadSidebarStats() {
+                try {
+                    const response = await fetch('/api/dashboard', {
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.recipient_stats) {
+                        this.updateSidebarStats(data.data);
+                    }
+                } catch (error) {
+                    console.error('Error loading sidebar stats:', error);
+                }
+            }
+            
+            updateSidebarStats(dashboardData) {
+                const stats = dashboardData.recipient_stats || {};
+                
+                // Update sidebar stats
+                document.getElementById('sidebarTotalCount').textContent = stats.total || 0;
+                document.getElementById('sidebarSentCount').textContent = stats.sent || 0;
+                document.getElementById('sidebarPendingCount').textContent = stats.pending || 0;
+                document.getElementById('sidebarFailedCount').textContent = stats.failed || 0;
+                
+                // Update progress ring
+                const progress = dashboardData.sidebar_progress || 0;
+                document.getElementById('sidebarProgressPercent').textContent = progress + '%';
+                this.updateSidebarProgressRing(progress);
+                
+                // Update campaign status badge
+                const statusBadge = document.getElementById('sidebarCampaignStatus');
+                if (stats.total > 0) {
+                    const completed = stats.sent + stats.failed;
+                    const total = stats.total;
+                    if (stats.pending > 0) {
+                        statusBadge.textContent = 'In Progress';
+                        statusBadge.className = 'badge bg-warning';
+                    } else if (completed === total) {
+                        statusBadge.textContent = 'Completed';
+                        statusBadge.className = 'badge bg-success';
+                    } else {
+                        statusBadge.textContent = 'Active';
+                        statusBadge.className = 'badge bg-info';
+                    }
+                } else {
+                    statusBadge.textContent = 'No Campaigns';
+                    statusBadge.className = 'badge bg-secondary';
+                }
+            }
+            
+            updateSidebarProgressRing(percentage) {
+                const circle = document.getElementById('sidebarProgressRing');
+                if (!circle) return;
+                
+                const radius = circle.r.baseVal.value;
+                const circumference = radius * 2 * Math.PI;
+                const offset = circumference - (percentage / 100) * circumference;
+                
+                circle.style.strokeDasharray = circumference;
+                circle.style.strokeDashoffset = offset;
+                circle.style.stroke = 'url(#sidebarGradient)';
+            }
+            
+            startSidebarPolling() {
+                // Poll every 3 seconds for real-time updates
+                setInterval(() => {
+                    this.loadSidebarStats();
+                }, 3000);
+            }
+            
+            // Blacklist Management Functions
+            async loadBlacklist() {
+                try {
+                    const response = await fetch('/api/blacklist', {
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.updateBlacklistTable(data.blacklist);
+                    }
+                } catch (error) {
+                    console.error('Error loading blacklist:', error);
+                }
+            }
+            
+            updateBlacklistTable(blacklist) {
+                const tbody = document.getElementById('blacklistTableBody');
+                
+                if (!blacklist || blacklist.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No blacklist entries</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = blacklist.map(entry => `
+                    <tr>
+                        <td>${entry.email || '-'}</td>
+                        <td>${entry.domain || '-'}</td>
+                        <td>${entry.reason || '-'}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="window.campaignManager?.removeFromBlacklist(${entry.id})">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            
+            async addEmailToBlacklist() {
+                const email = document.getElementById('blacklistEmail').value.trim();
+                const reason = document.getElementById('blacklistEmailReason').value.trim();
+                
+                if (!email) {
+                    this.showAlert('Please enter an email address', 'warning');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/blacklist/email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        },
+                        body: JSON.stringify({ email, reason: reason || null })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert('Email added to blacklist successfully', 'success');
+                        document.getElementById('blacklistEmail').value = '';
+                        document.getElementById('blacklistEmailReason').value = '';
+                        this.loadBlacklist();
+                    } else {
+                        this.showAlert(data.message || 'Failed to add email to blacklist', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+            
+            async addDomainToBlacklist() {
+                const domain = document.getElementById('blacklistDomain').value.trim();
+                const reason = document.getElementById('blacklistDomainReason').value.trim();
+                
+                if (!domain) {
+                    this.showAlert('Please enter a domain', 'warning');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/blacklist/domain', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        },
+                        body: JSON.stringify({ domain, reason: reason || null })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert('Domain added to blacklist successfully', 'success');
+                        document.getElementById('blacklistDomain').value = '';
+                        document.getElementById('blacklistDomainReason').value = '';
+                        this.loadBlacklist();
+                    } else {
+                        this.showAlert(data.message || 'Failed to add domain to blacklist', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+            
+            async bulkAddBlacklist(type) {
+                const entries = document.getElementById('blacklistBulk').value.trim();
+                
+                if (!entries) {
+                    this.showAlert('Please enter entries to add', 'warning');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/blacklist/bulk', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        },
+                        body: JSON.stringify({ entries, type })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert(`Bulk import successful: ${data.added} added, ${data.skipped} skipped`, 'success');
+                        document.getElementById('blacklistBulk').value = '';
+                        this.loadBlacklist();
+                    } else {
+                        this.showAlert(data.message || 'Failed to bulk import', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+            
+            async removeFromBlacklist(id) {
+                if (!confirm('Are you sure you want to remove this from the blacklist?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/blacklist/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert('Removed from blacklist successfully', 'success');
+                        this.loadBlacklist();
+                    } else {
+                        this.showAlert(data.message || 'Failed to remove from blacklist', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+            
+            // Pause/Resume Campaign Functions
+            async pauseCampaign() {
+                if (!this.currentCampaignId) {
+                    this.showAlert('No active campaign to pause', 'warning');
+                    return;
+                }
+                
+                if (!confirm('Are you sure you want to pause this campaign?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${this.currentCampaignId}/pause`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert('Campaign paused successfully', 'success');
+                        this.updateStatus(); // Refresh status
+                    } else {
+                        this.showAlert(data.message || 'Failed to pause campaign', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
+            }
+            
+            async resumeCampaign() {
+                if (!this.currentCampaignId) {
+                    this.showAlert('No active campaign to resume', 'warning');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${this.currentCampaignId}/resume`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': this.getAuthToken()
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert('Campaign resumed successfully', 'success');
+                        this.startPolling(); // Restart polling
+                        this.updateStatus(); // Refresh status
+                    } else {
+                        this.showAlert(data.message || 'Failed to resume campaign', 'danger');
+                    }
+                } catch (error) {
+                    this.showAlert('Error: ' + error.message, 'danger');
+                }
             }
 
             setupEventListeners() {
@@ -2379,21 +2685,39 @@
             }
 
             updateStatusDisplay(data) {
-                document.getElementById('totalCount').textContent = data.total;
-                document.getElementById('sentCount').textContent = data.sent;
-                document.getElementById('pendingCount').textContent = data.pending;
-                document.getElementById('failedCount').textContent = data.failed;
+                // Update sidebar stats for specific campaign
+                document.getElementById('sidebarTotalCount').textContent = data.total;
+                document.getElementById('sidebarSentCount').textContent = data.sent;
+                document.getElementById('sidebarPendingCount').textContent = data.pending;
+                document.getElementById('sidebarFailedCount').textContent = data.failed;
                 
                 const progressPercent = data.total > 0 ? Math.round((data.sent + data.failed) / data.total * 100) : 0;
-                document.getElementById('progressPercent').textContent = progressPercent + '%';
+                document.getElementById('sidebarProgressPercent').textContent = progressPercent + '%';
                 
                 // Update progress ring
-                updateProgressRing(progressPercent);
+                this.updateSidebarProgressRing(progressPercent);
                 
                 // Update campaign status badge
-                const statusBadge = document.getElementById('campaignStatus');
+                const statusBadge = document.getElementById('sidebarCampaignStatus');
                 statusBadge.textContent = data.campaign_status;
                 statusBadge.className = 'badge bg-' + this.getStatusColor(data.campaign_status);
+
+                // Show/hide pause/resume buttons
+                const pauseResumeButtons = document.getElementById('pauseResumeButtons');
+                const pauseBtn = document.getElementById('pauseCampaignBtn');
+                const resumeBtn = document.getElementById('resumeCampaignBtn');
+                
+                if (data.campaign_status === 'sending' || data.campaign_status === 'queued') {
+                    pauseResumeButtons.style.display = 'block';
+                    pauseBtn.style.display = 'inline-block';
+                    resumeBtn.style.display = 'none';
+                } else if (data.campaign_status === 'paused') {
+                    pauseResumeButtons.style.display = 'block';
+                    pauseBtn.style.display = 'none';
+                    resumeBtn.style.display = 'inline-block';
+                } else {
+                    pauseResumeButtons.style.display = 'none';
+                }
 
                 // Update recent recipients
                 this.updateRecentRecipients(data.recent_recipients);
@@ -2404,6 +2728,7 @@
                     'draft': 'secondary',
                     'queued': 'info',
                     'sending': 'warning',
+                    'paused': 'warning',
                     'completed': 'success'
                 };
                 return colors[status] || 'secondary';

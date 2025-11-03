@@ -29,6 +29,35 @@ class SmtpConfiguration extends Model
         'port' => 'integer'
     ];
 
+    protected $hidden = [
+        'password',
+    ];
+
+    /**
+     * Encrypt SMTP password before saving.
+     */
+    public function setPasswordAttribute($value)
+    {
+        $this->attributes['password'] = encrypt($value);
+    }
+
+    /**
+     * Decrypt SMTP password when retrieving.
+     */
+    public function getPasswordAttribute($value)
+    {
+        if (empty($value)) {
+            return $value;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Exception $e) {
+            // If decryption fails, assume it's already plaintext (for existing data)
+            return $value;
+        }
+    }
+
     /**
      * Get the default SMTP configuration
      */
@@ -62,12 +91,15 @@ class SmtpConfiguration extends Model
      */
     public function getMailConfig()
     {
+        // Get raw password for mail config (decrypted)
+        $password = $this->password;
+        
         return [
             'driver' => 'smtp',
             'host' => $this->host,
             'port' => $this->port,
             'username' => $this->username,
-            'password' => $this->password,
+            'password' => $password,
             'encryption' => $this->encryption,
             'from' => [
                 'address' => $this->from_address,
