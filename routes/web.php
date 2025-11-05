@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
         // Status and sender listing routes (less restrictive)
         Route::middleware(['throttle:30,1'])->group(function () {
             Route::get('/campaigns/{id}/status', [App\Http\Controllers\CampaignController::class, 'status']);
+            Route::get('/campaigns-history', [App\Http\Controllers\CampaignController::class, 'campaignsHistory']);
             Route::get('/senders', [App\Http\Controllers\CampaignController::class, 'senders']);
             Route::get('/dashboard', [App\Http\Controllers\CampaignController::class, 'dashboard']);
             

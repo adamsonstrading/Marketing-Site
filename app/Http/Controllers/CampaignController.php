@@ -13,6 +13,7 @@ use App\Services\SmtpRotationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
@@ -473,6 +474,67 @@ class CampaignController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch dashboard data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all campaigns with their recipients for history view
+     */
+    public function campaignsHistory(): JsonResponse
+    {
+        try {
+            $campaigns = Campaign::with(['sender', 'smtpConfiguration', 'recipients'])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($campaign) {
+                    $recipients = $campaign->recipients->map(function ($recipient) {
+                        return [
+                            'id' => $recipient->id,
+                            'email' => $recipient->email,
+                            'name' => $recipient->name,
+                            'status' => $recipient->status,
+                            'sent_at' => $recipient->sent_at ? $recipient->sent_at->format('M d, Y H:i:s') : null,
+                            'last_error' => $recipient->last_error,
+                            'attempt_count' => $recipient->attempt_count,
+                        ];
+                    });
+
+                    // Get recipient counts by status
+                    $recipientCounts = $campaign->recipients()
+                        ->selectRaw('status, COUNT(*) as count')
+                        ->groupBy('status')
+                        ->pluck('count', 'status')
+                        ->toArray();
+
+                    return [
+                        'id' => $campaign->id,
+                        'name' => $campaign->name,
+                        'subject' => $campaign->subject,
+                        'body' => $campaign->body,
+                        'status' => $campaign->status,
+                        'total_recipients' => $campaign->total_recipients,
+                        'created_at' => $campaign->created_at ? $campaign->created_at->format('M d, Y H:i') : '-',
+                        'updated_at' => $campaign->updated_at ? $campaign->updated_at->format('M d, Y H:i') : '-',
+                        'sender_name' => $campaign->sender->name ?? 'Unknown',
+                        'smtp_configuration_name' => $campaign->smtpConfiguration->name ?? 'Unknown',
+                        'recipient_counts' => [
+                            'sent' => $recipientCounts['sent'] ?? 0,
+                            'pending' => $recipientCounts['pending'] ?? 0,
+                            'failed' => $recipientCounts['failed'] ?? 0,
+                        ],
+                        'recipients' => $recipients,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $campaigns
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch campaigns history: ' . $e->getMessage()
             ], 500);
         }
     }
