@@ -20,13 +20,27 @@ class SmtpConfiguration extends Model
         'encryption',
         'is_active',
         'is_default',
-        'description'
+        'description',
+        'total_sent',
+        'total_failed',
+        'success_rate',
+        'last_used_at',
+        'daily_limit',
+        'daily_count',
+        'daily_reset_date'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',
-        'port' => 'integer'
+        'port' => 'integer',
+        'total_sent' => 'integer',
+        'total_failed' => 'integer',
+        'success_rate' => 'integer',
+        'daily_limit' => 'integer',
+        'daily_count' => 'integer',
+        'last_used_at' => 'datetime',
+        'daily_reset_date' => 'date'
     ];
 
     protected $hidden = [

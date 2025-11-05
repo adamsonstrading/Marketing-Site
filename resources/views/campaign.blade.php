@@ -699,8 +699,58 @@
             padding: 1rem 0.75rem;
         }
 
+        /* Campaign History Cards */
+        .campaign-history-card {
+            transition: all 0.3s ease;
+        }
+
+        .campaign-history-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .campaign-history-header {
+            transition: background 0.3s ease;
+        }
+
+        .campaign-history-header:hover {
+            background: var(--card-bg) !important;
+        }
+
+        .campaign-history-details {
+            border-top: 1px solid var(--border-color);
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
+        }
+
         .table-striped tbody tr:nth-of-type(odd) {
             background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Campaign History Table Styles */
+        .campaign-history-details table tbody tr:hover {
+            background: var(--secondary-bg) !important;
+        }
+
+        .campaign-history-details table tbody tr td {
+            color: #ffffff !important;
+        }
+
+        [data-theme="light"] .campaign-history-details table tbody tr td {
+            color: #212529 !important;
+        }
+
+        [data-theme="light"] .campaign-history-details table thead th {
+            color: #212529 !important;
         }
 
         /* Badges */
@@ -1286,6 +1336,33 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Campaign History Section -->
+                <div class="row mt-4">
+                    <div class="col-lg-12">
+                        <div class="modern-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="card-title">
+                                    <i class="fas fa-history"></i>
+                                    Campaign History
+                                </h3>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.campaignManager?.loadCampaignsHistory()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="campaignsHistoryContainer">
+                                    <div class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 text-muted">Loading campaign history...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Campaign Tab -->
@@ -1348,8 +1425,13 @@
 
                                     <div class="form-group">
                                         <label for="message" class="form-label">Message (HTML allowed)</label>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="form-text">You can use HTML tags for formatting. Select a template above to auto-fill the message.</span>
+                                            <button type="button" class="btn btn-outline-info btn-sm" id="previewBtn" onclick="showEmailPreview()">
+                                                <i class="fas fa-eye"></i> Preview Email
+                                            </button>
+                                        </div>
                                         <textarea class="form-control" id="message" name="body" rows="6" required placeholder="Enter your email message... Or select a template above to auto-fill"></textarea>
-                                        <div class="form-text">You can use HTML tags for formatting. Select a template above to auto-fill the message.</div>
                                     </div>
 
                                     <div class="form-group">
@@ -1734,6 +1816,7 @@
                 this.loadDashboardData();
                 this.loadSidebarStats();
                 this.startSidebarPolling();
+                this.loadCampaignsHistory();
             }
 
             getAuthToken() {
@@ -2088,6 +2171,145 @@
                 setInterval(() => {
                     this.loadSidebarStats();
                 }, 3000);
+            }
+            
+            // Campaign History Functions
+            async loadCampaignsHistory() {
+                try {
+                    const response = await fetch('/api/campaigns-history', {
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.displayCampaignsHistory(data.data);
+                    } else {
+                        document.getElementById('campaignsHistoryContainer').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load campaign history: ' + (data.message || 'Unknown error') + '</div>';
+                    }
+                } catch (error) {
+                    console.error('Error loading campaigns history:', error);
+                    document.getElementById('campaignsHistoryContainer').innerHTML = 
+                        '<div class="alert alert-danger">Error loading campaign history: ' + error.message + '</div>';
+                }
+            }
+            
+            displayCampaignsHistory(campaigns) {
+                const container = document.getElementById('campaignsHistoryContainer');
+                
+                if (!campaigns || campaigns.length === 0) {
+                    container.innerHTML = '<div class="text-center py-4"><p class="text-muted">No campaigns found.</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = campaigns.map(campaign => {
+                    const statusIcon = this.getCampaignStatusIcon(campaign.status);
+                    const statusColor = this.getCampaignStatusColor(campaign.status);
+                    const recipientCounts = campaign.recipient_counts || {};
+                    
+                    return `
+                        <div class="campaign-history-card mb-3" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                            <div class="campaign-history-header" style="background: var(--secondary-bg); padding: 15px 20px; cursor: pointer;" 
+                                 onclick="toggleCampaignDetails(${campaign.id})">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <h5 class="mb-1" style="color: var(--text-primary);">
+                                            <i class="fas fa-envelope me-2"></i>${this.escapeHtml(campaign.name)}
+                                        </h5>
+                                        <div class="small text-muted mb-1">
+                                            <strong>Subject:</strong> ${this.escapeHtml(campaign.subject)}
+                                        </div>
+                                        <div class="small text-muted">
+                                            <i class="fas fa-calendar me-1"></i> ${campaign.created_at} • 
+                                            <i class="fas fa-users me-1"></i> ${campaign.total_recipients} recipients • 
+                                            <i class="fas fa-check-circle me-1"></i> ${recipientCounts.sent || 0} sent • 
+                                            <i class="fas fa-clock me-1"></i> ${recipientCounts.pending || 0} pending • 
+                                            <i class="fas fa-times-circle me-1"></i> ${recipientCounts.failed || 0} failed
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-${statusColor}">${statusIcon} ${campaign.status}</span>
+                                        <i class="fas fa-chevron-down" id="chevron-${campaign.id}" style="transition: transform 0.3s;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="campaign-history-details" id="details-${campaign.id}" style="display: none; padding: 20px; background: var(--card-bg);">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="small text-muted mb-1"><strong>Sender:</strong> ${this.escapeHtml(campaign.sender_name || 'Unknown')}</div>
+                                        <div class="small text-muted mb-1"><strong>SMTP:</strong> ${this.escapeHtml(campaign.smtp_configuration_name || 'Unknown')}</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="small text-muted mb-1"><strong>Created:</strong> ${campaign.created_at}</div>
+                                        <div class="small text-muted mb-1"><strong>Updated:</strong> ${campaign.updated_at || campaign.created_at}</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Email Message Preview -->
+                                <div class="mb-4" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                                    <div style="background: var(--secondary-bg); padding: 12px 15px; border-bottom: 1px solid var(--border-color);">
+                                        <strong style="color: var(--text-primary);">
+                                            <i class="fas fa-envelope me-2"></i>Email Message Preview
+                                        </strong>
+                                    </div>
+                                    <div style="background: #f5f5f5; padding: 20px; max-height: 400px; overflow-y: auto;">
+                                        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                            <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e0e0e0;">
+                                                <strong style="color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Subject:</strong>
+                                                <div style="margin-top: 5px; font-size: 16px; color: #333; font-weight: 600;">${this.escapeHtml(campaign.subject)}</div>
+                                            </div>
+                                            <div style="color: #333; line-height: 1.8; font-size: 14px;">
+                                                ${campaign.body || 'No message content'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <strong class="small text-muted d-block mb-2" style="color: var(--text-primary) !important;">Recipients:</strong>
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+                                        <table class="table table-sm table-hover" style="margin-bottom: 0; background: var(--card-bg);">
+                                            <thead style="position: sticky; top: 0; background: var(--secondary-bg); z-index: 10; border-bottom: 2px solid var(--border-color);">
+                                                <tr>
+                                                    <th style="color: #ffffff !important; background: var(--secondary-bg) !important; font-weight: 600; padding: 12px;">Email</th>
+                                                    <th style="color: #ffffff !important; background: var(--secondary-bg) !important; font-weight: 600; padding: 12px;">Name</th>
+                                                    <th style="color: #ffffff !important; background: var(--secondary-bg) !important; font-weight: 600; padding: 12px;">Status</th>
+                                                    <th style="color: #ffffff !important; background: var(--secondary-bg) !important; font-weight: 600; padding: 12px;">Sent At</th>
+                                                    <th style="color: #ffffff !important; background: var(--secondary-bg) !important; font-weight: 600; padding: 12px;">Error</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody style="background: var(--card-bg);">
+                                                ${campaign.recipients && campaign.recipients.length > 0 
+                                                    ? campaign.recipients.map(recipient => {
+                                                        const recipientStatusColor = recipient.status === 'sent' ? 'success' : 
+                                                                                    recipient.status === 'failed' ? 'danger' : 'warning';
+                                                        return `
+                                                            <tr style="border-bottom: 1px solid var(--border-color); background: var(--card-bg);">
+                                                                <td style="color: #00d4ff !important; font-weight: 500; padding: 12px; background: var(--card-bg) !important;">${this.escapeHtml(recipient.email)}</td>
+                                                                <td style="color: #ffffff !important; padding: 12px; background: var(--card-bg) !important;">${this.escapeHtml(recipient.name || '-')}</td>
+                                                                <td style="padding: 12px; background: var(--card-bg) !important;"><span class="badge bg-${recipientStatusColor}">${recipient.status}</span></td>
+                                                                <td style="color: #b0b0b0 !important; padding: 12px; background: var(--card-bg) !important;">${recipient.sent_at || '-'}</td>
+                                                                <td style="color: #ff4444 !important; font-size: 11px; padding: 12px; background: var(--card-bg) !important;">${this.escapeHtml(recipient.last_error || '-')}</td>
+                                                            </tr>
+                                                        `;
+                                                    }).join('')
+                                                    : '<tr style="background: var(--card-bg);"><td colspan="5" class="text-center" style="color: var(--text-primary) !important; padding: 20px;">No recipients</td></tr>'
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
             
             // Blacklist Management Functions
@@ -3213,6 +3435,75 @@
                 card.classList.add('animate-in');
             });
         });
+
+        // Email Preview Functionality
+        function showEmailPreview() {
+            const subject = document.getElementById('subject').value || 'No Subject';
+            const message = document.getElementById('message').value || 'No message content';
+            
+            // Set preview content
+            document.getElementById('previewSubject').textContent = subject;
+            document.getElementById('previewBody').innerHTML = message;
+            
+            // Show modal
+            const previewModal = new bootstrap.Modal(document.getElementById('emailPreviewModal'));
+            previewModal.show();
+        }
+
+        // Toggle Campaign Details
+        function toggleCampaignDetails(campaignId) {
+            const detailsDiv = document.getElementById(`details-${campaignId}`);
+            const chevron = document.getElementById(`chevron-${campaignId}`);
+            
+            if (detailsDiv.style.display === 'none') {
+                detailsDiv.style.display = 'block';
+                if (chevron) {
+                    chevron.style.transform = 'rotate(180deg)';
+                }
+            } else {
+                detailsDiv.style.display = 'none';
+                if (chevron) {
+                    chevron.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
     </script>
+
+    <!-- Email Preview Modal -->
+    <div class="modal fade" id="emailPreviewModal" tabindex="-1" aria-labelledby="emailPreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                    <h5 class="modal-title" id="emailPreviewModalLabel">
+                        <i class="fas fa-envelope"></i> Email Preview
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body" style="background: #f5f5f5; padding: 20px; min-height: 400px;">
+                    <!-- Email Preview Container -->
+                    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <!-- Email Subject -->
+                        <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;">
+                            <strong style="color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px;">Email Subject:</strong>
+                            <div id="previewSubject" style="font-size: 20px; color: #333; font-weight: 600; line-height: 1.4;"></div>
+                        </div>
+                        
+                        <!-- Email Body -->
+                        <div id="previewBody" style="color: #333; line-height: 1.8; font-size: 14px;">
+                            <!-- Preview content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="showEmailPreview()">
+                        <i class="fas fa-sync-alt"></i> Refresh Preview
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
