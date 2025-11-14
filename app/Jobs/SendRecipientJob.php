@@ -262,7 +262,9 @@ class SendRecipientJob implements ShouldQueue
                 'status' => 'failed',
                 'last_error' => $exception->getMessage(),
             ]);
-            $this->recomputeCampaignStatus($recipient->campaign_id);
+            if ($recipient->campaign_id) {
+                $this->recomputeCampaignStatus($recipient->campaign_id);
+            }
         }
     }
 

@@ -1157,26 +1157,6 @@
             color: var(--text-secondary) !important;
         }
 
-        /* N8nMail Tab Styles */
-        #n8nmail-tab * {
-            color: var(--text-primary) !important;
-        }
-
-        #n8nmail-tab .form-label {
-            color: var(--text-primary) !important;
-        }
-
-        #n8nmail-tab .form-text {
-            color: var(--text-secondary) !important;
-        }
-
-        #n8nmail-tab h6 {
-            color: var(--text-primary) !important;
-        }
-
-        #n8nmail-tab small {
-            color: var(--text-secondary) !important;
-        }
     </style>
 </head>
 <body>
@@ -1202,12 +1182,6 @@
                 <a href="#" class="nav-link" onclick="showTab('campaign')">
                     <i class="fas fa-paper-plane"></i>
                     Campaign
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="#" class="nav-link" onclick="showTab('n8nmail')">
-                    <i class="fas fa-envelope-open"></i>
-                    N8nMail
                 </a>
             </div>
         </div>
@@ -1369,7 +1343,7 @@
             <div id="campaign-tab" class="tab-content" style="display: none;">
                 <div class="row">
                     <!-- Campaign Form -->
-                    <div class="col-lg-8">
+                    <div class="col-lg-12">
                         <div class="modern-card">
                             <div class="card-header">
                                 <h3 class="card-title">
@@ -1389,9 +1363,14 @@
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="smtpConfigSelect" class="form-label">SMTP Configuration</label>
-                                                <select class="form-select" id="smtpConfigSelect" name="smtp_configuration_id" required>
-                                                    <option value="">Loading SMTP configurations...</option>
-                                                </select>
+                                                <div class="d-flex gap-2">
+                                                    <select class="form-select" id="smtpConfigSelect" name="smtp_configuration_id" required>
+                                                        <option value="">Loading SMTP configurations...</option>
+                                                    </select>
+                                                    <button type="button" class="btn btn-outline-primary" onclick="showCreateSmtpModal()" title="Create New SMTP">
+                                                        <i class="fas fa-plus"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="form-text">Choose which email service to use for sending</div>
                                             </div>
                                         </div>
@@ -1410,9 +1389,14 @@
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="templateSelect" class="form-label">Email Template</label>
-                                                <select class="form-select" id="templateSelect" name="template_id">
-                                                    <option value="">No template (use custom message)</option>
-                                                </select>
+                                                <div class="d-flex gap-2">
+                                                    <select class="form-select" id="templateSelect" name="template_id">
+                                                        <option value="">No template (use custom message)</option>
+                                                    </select>
+                                                    <button type="button" class="btn btn-outline-primary" onclick="showCreateTemplateModal()" title="Create New Template">
+                                                        <i class="fas fa-plus"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="form-text">Choose a template or use custom message below</div>
                                             </div>
                                         </div>
@@ -1426,12 +1410,21 @@
                                     <div class="form-group">
                                         <label for="message" class="form-label">Message (HTML allowed)</label>
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="form-text">You can use HTML tags for formatting. Select a template above to auto-fill the message.</span>
-                                            <button type="button" class="btn btn-outline-info btn-sm" id="previewBtn" onclick="showEmailPreview()">
-                                                <i class="fas fa-eye"></i> Preview Email
+                                            <span class="form-text">Select a template above to preview it, or enter custom HTML below.</span>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleEditBtn" onclick="toggleMessageEdit()">
+                                                <i class="fas fa-code"></i> Edit HTML
                                             </button>
                                         </div>
-                                        <textarea class="form-control" id="message" name="body" rows="6" required placeholder="Enter your email message... Or select a template above to auto-fill"></textarea>
+                                        
+                                        <!-- Template Preview Container -->
+                                        <div id="templatePreviewContainer" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; background: #f5f5f5; min-height: 400px; max-height: 600px; overflow-y: auto;">
+                                            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                                <div id="templatePreview"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Textarea for storing HTML code (hidden when preview is shown) -->
+                                        <textarea class="form-control" id="message" name="body" rows="6" required placeholder="Enter your email message... Or select a template above to preview"></textarea>
                                     </div>
 
                                     <div class="form-group">
@@ -1507,196 +1500,9 @@
                         </div>
 
                     </div>
-
-                    <!-- Status Dashboard -->
-                    <div class="col-lg-4">
-                        <div class="modern-card" id="statusCard" style="display: none;">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="fas fa-chart-line"></i>
-                                    Campaign Status
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <!-- Status Metrics -->
-                                <div class="status-grid">
-                                    <div class="status-card">
-                                        <div class="status-number" id="sidebarTotalCount">0</div>
-                                        <div class="status-label">Total</div>
-                                    </div>
-                                    <div class="status-card">
-                                        <div class="status-number" id="sidebarSentCount">0</div>
-                                        <div class="status-label">Sent</div>
-                                    </div>
-                                    <div class="status-card">
-                                        <div class="status-number" id="sidebarPendingCount">0</div>
-                                        <div class="status-label">Pending</div>
-                                    </div>
-                                    <div class="status-card">
-                                        <div class="status-number" id="sidebarFailedCount">0</div>
-                                        <div class="status-label">Failed</div>
-                                    </div>
-                                </div>
-
-                                <!-- Progress Ring -->
-                                <div class="progress-ring">
-                                    <svg>
-                                        <defs>
-                                            <linearGradient id="sidebarGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
-                                                <stop offset="100%" style="stop-color:#0099cc;stop-opacity:1" />
-                                            </linearGradient>
-                                        </defs>
-                                        <circle class="progress-ring-circle progress-ring-bg" cx="60" cy="60" r="52"></circle>
-                                        <circle class="progress-ring-circle progress-ring-progress" cx="60" cy="60" r="52" 
-                                                stroke-dasharray="326.73" stroke-dashoffset="326.73" id="sidebarProgressRing"></circle>
-                                    </svg>
-                                    <div class="progress-text" id="sidebarProgressPercent">0%</div>
-                                </div>
-
-                                <div class="mb-3 text-center">
-                                    <small class="text-muted">Campaign Status: <span id="sidebarCampaignStatus" class="badge bg-secondary">Unknown</span></small>
-                                    <div class="mt-2" id="pauseResumeButtons" style="display: none;">
-                                        <button type="button" class="btn btn-sm btn-warning me-1" id="pauseCampaignBtn" onclick="window.campaignManager?.pauseCampaign()">
-                                            <i class="fas fa-pause"></i> Pause
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-success" id="resumeCampaignBtn" onclick="window.campaignManager?.resumeCampaign()" style="display: none;">
-                                            <i class="fas fa-play"></i> Resume
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="recipient-table">
-                                    <h6 class="text-muted mb-2">Recent Activity</h6>
-                                    <div id="recentRecipients">
-                                        <small class="text-muted">No activity yet</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            <!-- N8nMail Tab -->
-            <div id="n8nmail-tab" class="tab-content" style="display: none;">
-                <div class="row">
-                    <div class="col-lg-12">
-                        <div class="modern-card">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="fas fa-envelope-open"></i>
-                                    Send Email via N8nMail
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <form id="n8nmailForm">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="n8nSmtpConfigSelect" class="form-label">SMTP Configuration</label>
-                                                <select class="form-select" id="n8nSmtpConfigSelect" name="smtp_configuration_id" required>
-                                                    <option value="">Loading SMTP configurations...</option>
-                                                </select>
-                                                <div class="form-text">Choose which email service to use for sending</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="n8nSenderSelect" class="form-label">Sender</label>
-                                                <select class="form-select" id="n8nSenderSelect" name="sender_id" required>
-                                                    <option value="">Loading senders...</option>
-                                                </select>
-                                                <div class="form-text">Choose the sender for this email</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="n8nSubject" class="form-label">Subject</label>
-                                        <input type="text" class="form-control" id="n8nSubject" name="subject" required placeholder="Enter email subject">
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="n8nMessage" class="form-label">Message (HTML allowed)</label>
-                                        <textarea class="form-control" id="n8nMessage" name="body" rows="6" required placeholder="Enter your email message..."></textarea>
-                                        <div class="form-text">You can use HTML tags for formatting.</div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label class="form-label">Recipients</label>
-                                        
-                                        <!-- Tab Navigation -->
-                                        <ul class="nav nav-tabs" id="n8nRecipientTabs" role="tablist">
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link active" id="n8n-manual-tab" data-bs-toggle="tab" data-bs-target="#n8n-manual" type="button" role="tab">
-                                                    <i class="fas fa-keyboard"></i> Manual Entry
-                                                </button>
-                                            </li>
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link" id="n8n-csv-tab" data-bs-toggle="tab" data-bs-target="#n8n-csv" type="button" role="tab">
-                                                    <i class="fas fa-file-excel"></i> File Upload
-                                                </button>
-                                            </li>
-                                        </ul>
-                                        
-                                        <!-- Tab Content -->
-                                        <div class="tab-content" id="n8nRecipientTabContent">
-                                            <!-- Manual Entry Tab -->
-                                            <div class="tab-pane fade show active" id="n8n-manual" role="tabpanel">
-                                                <textarea class="form-control mt-3" id="n8nRecipients" name="recipients" rows="4" 
-                                                    placeholder="Enter email addresses, one per line&#10;example@domain.com&#10;another@domain.com"></textarea>
-                                                <div class="form-text">One email address per line. Maximum 500 recipients.</div>
-                                            </div>
-                                            
-                                            <!-- CSV Upload Tab -->
-                                            <div class="tab-pane fade" id="n8n-csv" role="tabpanel">
-                                                <div class="mt-3">
-                                                    <div class="form-group">
-                                                        <label for="n8nCsvFile" class="form-label">Upload File</label>
-                                                        <input type="file" class="form-control" id="n8nCsvFile" accept=".csv,.xls,.xlsx" />
-                                                        <div class="form-text">
-                                                            Upload CSV file with email addresses in the first column. 
-                                                            For Excel files (.xls/.xlsx), please convert to CSV format first.
-                                                            Maximum 500 recipients. <a href="#" id="n8nDownloadSample">Download sample CSV</a>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div id="n8nCsvPreview" class="mt-3" style="display: none;">
-                                                        <h6>CSV Preview:</h6>
-                                                        <div class="table-responsive">
-                                                            <table class="table table-sm table-striped">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>Email</th>
-                                                                        <th>Name (Optional)</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody id="n8nCsvPreviewBody">
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                        <div class="alert alert-info">
-                                                            <strong>Found <span id="n8nCsvCount">0</span> email addresses</strong>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-primary btn-lg" id="n8nSubmitBtn">
-                                            <i class="fas fa-paper-plane"></i>
-                                            Send
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -1763,7 +1569,6 @@
             // Hide all tabs
             document.getElementById('dashboard-tab').style.display = 'none';
             document.getElementById('campaign-tab').style.display = 'none';
-            document.getElementById('n8nmail-tab').style.display = 'none';
             
             // Remove active class from all nav links
             document.querySelectorAll('.nav-link').forEach(link => {
@@ -1777,13 +1582,6 @@
             } else if (tabName === 'campaign') {
                 document.getElementById('campaign-tab').style.display = 'block';
                 document.querySelector('.nav-link[onclick="showTab(\'campaign\')"]').classList.add('active');
-            } else if (tabName === 'n8nmail') {
-                document.getElementById('n8nmail-tab').style.display = 'block';
-                document.querySelector('.nav-link[onclick="showTab(\'n8nmail\')"]').classList.add('active');
-                // Load data when switching to n8nmail tab
-                if (window.campaignManager) {
-                    window.campaignManager.loadN8nMailData();
-                }
             }
         }
 
@@ -1803,8 +1601,8 @@
             constructor() {
                 this.currentCampaignId = null;
                 this.pollingInterval = null;
+                this.dashboardRefreshInterval = null;
                 this.csvData = null;
-                this.n8nCsvData = null;
                 this.init();
             }
 
@@ -1814,14 +1612,13 @@
                 this.loadEmailTemplates();
                 this.setupEventListeners();
                 this.loadDashboardData();
-                this.loadSidebarStats();
-                this.startSidebarPolling();
                 this.loadCampaignsHistory();
             }
 
             getAuthToken() {
                 // Get the CSRF token from meta tag
-                return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const tokenElement = document.querySelector('meta[name="csrf-token"]');
+                return tokenElement ? tokenElement.getAttribute('content') : '';
             }
 
             getAuthHeaders() {
@@ -2001,8 +1798,11 @@
                             document.getElementById('subject').value = data.template.subject;
                         }
                         
-                        // Update message body
+                        // Store HTML code in hidden textarea
                         document.getElementById('message').value = data.template.body;
+                        
+                        // Show preview instead of code
+                        this.showTemplatePreview(data.template.body);
                         
                         this.showAlert('Template loaded successfully!', 'success');
                     }
@@ -2013,6 +1813,29 @@
             }
 
             async loadDashboardData() {
+                // Only set up interval if not already set
+                if (!this.dashboardRefreshInterval) {
+                    // Load immediately
+                    await this.refreshDashboardData();
+                    
+                    // Then refresh every 30 seconds (reduced frequency for production)
+                    this.dashboardRefreshInterval = setInterval(() => {
+                        this.refreshDashboardData();
+                    }, 30000); // 30 seconds instead of 10
+                } else {
+                    // Just refresh once if interval already exists
+                    this.refreshDashboardData();
+                }
+            }
+            
+            stopDashboardRefresh() {
+                if (this.dashboardRefreshInterval) {
+                    clearInterval(this.dashboardRefreshInterval);
+                    this.dashboardRefreshInterval = null;
+                }
+            }
+
+            async refreshDashboardData() {
                 try {
                     const response = await fetch('/api/dashboard', {
                         headers: this.getAuthHeaders()
@@ -2103,75 +1926,6 @@
                 return colors[status] || 'secondary';
             }
             
-            async loadSidebarStats() {
-                try {
-                    const response = await fetch('/api/dashboard', {
-                        headers: this.getAuthHeaders()
-                    });
-                    const data = await response.json();
-                    
-                    if (data.success && data.data.recipient_stats) {
-                        this.updateSidebarStats(data.data);
-                    }
-                } catch (error) {
-                    console.error('Error loading sidebar stats:', error);
-                }
-            }
-            
-            updateSidebarStats(dashboardData) {
-                const stats = dashboardData.recipient_stats || {};
-                
-                // Update sidebar stats
-                document.getElementById('sidebarTotalCount').textContent = stats.total || 0;
-                document.getElementById('sidebarSentCount').textContent = stats.sent || 0;
-                document.getElementById('sidebarPendingCount').textContent = stats.pending || 0;
-                document.getElementById('sidebarFailedCount').textContent = stats.failed || 0;
-                
-                // Update progress ring
-                const progress = dashboardData.sidebar_progress || 0;
-                document.getElementById('sidebarProgressPercent').textContent = progress + '%';
-                this.updateSidebarProgressRing(progress);
-                
-                // Update campaign status badge
-                const statusBadge = document.getElementById('sidebarCampaignStatus');
-                if (stats.total > 0) {
-                    const completed = stats.sent + stats.failed;
-                    const total = stats.total;
-                    if (stats.pending > 0) {
-                        statusBadge.textContent = 'In Progress';
-                        statusBadge.className = 'badge bg-warning';
-                    } else if (completed === total) {
-                        statusBadge.textContent = 'Completed';
-                        statusBadge.className = 'badge bg-success';
-                    } else {
-                        statusBadge.textContent = 'Active';
-                        statusBadge.className = 'badge bg-info';
-                    }
-                } else {
-                    statusBadge.textContent = 'No Campaigns';
-                    statusBadge.className = 'badge bg-secondary';
-                }
-            }
-            
-            updateSidebarProgressRing(percentage) {
-                const circle = document.getElementById('sidebarProgressRing');
-                if (!circle) return;
-                
-                const radius = circle.r.baseVal.value;
-                const circumference = radius * 2 * Math.PI;
-                const offset = circumference - (percentage / 100) * circumference;
-                
-                circle.style.strokeDasharray = circumference;
-                circle.style.strokeDashoffset = offset;
-                circle.style.stroke = 'url(#sidebarGradient)';
-            }
-            
-            startSidebarPolling() {
-                // Poll every 3 seconds for real-time updates
-                setInterval(() => {
-                    this.loadSidebarStats();
-                }, 3000);
-            }
             
             // Campaign History Functions
             async loadCampaignsHistory() {
@@ -2543,45 +2297,6 @@
                     this.createCampaign();
                 });
 
-                // N8nMail form submission
-                const n8nMailForm = document.getElementById('n8nmailForm');
-                if (n8nMailForm) {
-                    n8nMailForm.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        this.sendN8nMail();
-                    });
-                }
-
-                // N8nMail CSV file upload
-                const n8nCsvFile = document.getElementById('n8nCsvFile');
-                if (n8nCsvFile) {
-                    n8nCsvFile.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            this.handleN8nCsvFile(file);
-                        }
-                    });
-                }
-
-                // N8nMail sample CSV download
-                const n8nDownloadSample = document.getElementById('n8nDownloadSample');
-                if (n8nDownloadSample) {
-                    n8nDownloadSample.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.downloadN8nSampleCsv();
-                    });
-                }
-
-                // N8nMail sender selection change event
-                const n8nSenderSelect = document.getElementById('n8nSenderSelect');
-                if (n8nSenderSelect) {
-                    n8nSenderSelect.addEventListener('change', (e) => {
-                        const selectedOption = e.target.options[e.target.selectedIndex];
-                        if (selectedOption.dataset.email) {
-                            this.autoSelectN8nSmtpConfig(selectedOption.dataset.email);
-                        }
-                    });
-                }
 
                 // Sender selection change event
                 const senderSelect = document.getElementById('senderSelect');
@@ -2601,6 +2316,22 @@
                         const templateId = e.target.value;
                         if (templateId) {
                             this.loadTemplateContent(templateId);
+                        } else {
+                            // No template selected - show textarea, hide preview
+                            const previewContainer = document.getElementById('templatePreviewContainer');
+                            const messageTextarea = document.getElementById('message');
+                            const toggleBtn = document.getElementById('toggleEditBtn');
+                            
+                            if (previewContainer) {
+                                previewContainer.style.display = 'none';
+                            }
+                            if (messageTextarea) {
+                                messageTextarea.style.display = 'block';
+                                messageTextarea.value = '';
+                            }
+                            if (toggleBtn) {
+                                toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
+                            }
                         }
                     });
                 }
@@ -2822,21 +2553,45 @@
                         }
                     }
 
-                    const response = await fetch('/api/campaigns', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': this.getAuthToken()
-                        },
-                        body: formData
-                    });
+                    // Add timeout to prevent hanging (60 seconds)
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 60000);
+                    
+                    let response;
+                    try {
+                        response = await fetch('/api/campaigns', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': this.getAuthToken()
+                            },
+                            body: formData,
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        if (error.name === 'AbortError') {
+                            this.showAlert('Request timeout: Campaign creation is taking too long. Please check if the campaign was created.', 'warning');
+                        } else {
+                            throw error;
+                        }
+                        return;
+                    }
 
                     const data = await response.json();
 
                     if (data.success) {
                         this.currentCampaignId = data.campaign_id;
                         this.showAlert(`Campaign created successfully! ${data.total_recipients} emails queued.`, 'success');
-                        this.showStatusCard();
-                        this.startPolling();
+                        
+                        // Refresh dashboard and campaign history immediately
+                        this.refreshDashboardData();
+                        this.loadCampaignsHistory();
+                        
+                        // Switch to dashboard tab to show updated status
+                        setTimeout(() => {
+                            showTab('dashboard');
+                        }, 500);
                         form.reset();
                         
                         // Clear CSV data and preview
@@ -2856,9 +2611,6 @@
                 }
             }
 
-            showStatusCard() {
-                document.getElementById('statusCard').style.display = 'block';
-            }
 
             // (Live dashboard removed)
 
@@ -2907,42 +2659,7 @@
             }
 
             updateStatusDisplay(data) {
-                // Update sidebar stats for specific campaign
-                document.getElementById('sidebarTotalCount').textContent = data.total;
-                document.getElementById('sidebarSentCount').textContent = data.sent;
-                document.getElementById('sidebarPendingCount').textContent = data.pending;
-                document.getElementById('sidebarFailedCount').textContent = data.failed;
-                
-                const progressPercent = data.total > 0 ? Math.round((data.sent + data.failed) / data.total * 100) : 0;
-                document.getElementById('sidebarProgressPercent').textContent = progressPercent + '%';
-                
-                // Update progress ring
-                this.updateSidebarProgressRing(progressPercent);
-                
-                // Update campaign status badge
-                const statusBadge = document.getElementById('sidebarCampaignStatus');
-                statusBadge.textContent = data.campaign_status;
-                statusBadge.className = 'badge bg-' + this.getStatusColor(data.campaign_status);
-
-                // Show/hide pause/resume buttons
-                const pauseResumeButtons = document.getElementById('pauseResumeButtons');
-                const pauseBtn = document.getElementById('pauseCampaignBtn');
-                const resumeBtn = document.getElementById('resumeCampaignBtn');
-                
-                if (data.campaign_status === 'sending' || data.campaign_status === 'queued') {
-                    pauseResumeButtons.style.display = 'block';
-                    pauseBtn.style.display = 'inline-block';
-                    resumeBtn.style.display = 'none';
-                } else if (data.campaign_status === 'paused') {
-                    pauseResumeButtons.style.display = 'block';
-                    pauseBtn.style.display = 'none';
-                    resumeBtn.style.display = 'inline-block';
-                } else {
-                    pauseResumeButtons.style.display = 'none';
-                }
-
-                // Update recent recipients
-                this.updateRecentRecipients(data.recent_recipients);
+                // Status display functionality removed - dashboard no longer shown
             }
 
             getStatusColor(status) {
@@ -2956,29 +2673,6 @@
                 return colors[status] || 'secondary';
             }
 
-            updateRecentRecipients(recipients) {
-                const container = document.getElementById('recentRecipients');
-                
-                if (recipients.length === 0) {
-                    container.innerHTML = '<small class="text-muted">No activity yet</small>';
-                    return;
-                }
-
-                container.innerHTML = recipients.map(recipient => {
-                    const statusIcon = this.getStatusIcon(recipient.status);
-                    const statusColor = this.getStatusColor(recipient.status);
-                    const sentTime = recipient.sent_at ? new Date(recipient.sent_at).toLocaleTimeString() : '';
-                    
-                    return `
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <small class="text-truncate me-2" style="max-width: 150px;">${recipient.email}</small>
-                            <span class="badge bg-${statusColor}">${statusIcon}</span>
-                        </div>
-                        ${recipient.last_error ? `<small class="text-danger">${recipient.last_error}</small>` : ''}
-                        ${sentTime ? `<small class="text-muted">${sentTime}</small>` : ''}
-                    `;
-                }).join('');
-            }
 
             getStatusIcon(status) {
                 const icons = {
@@ -3018,327 +2712,27 @@
                 }, 5000);
             }
 
-            // N8nMail functions
-            async loadN8nMailData() {
-                await this.loadN8nSmtpConfigurations();
-                await this.loadN8nSenders();
-            }
-
-            async loadN8nSmtpConfigurations() {
-                const select = document.getElementById('n8nSmtpConfigSelect');
-                if (!select) return;
-
-                try {
-                    const response = await fetch('/api/smtp-configurations/active', {
-                        headers: this.getAuthHeaders()
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-
-                    if (data.success && data.configurations && data.configurations.length > 0) {
-                        select.innerHTML = '<option value="">Select SMTP Configuration...</option>';
-                        data.configurations.forEach(config => {
-                            const option = document.createElement('option');
-                            option.value = config.id;
-                            option.textContent = `${config.name} (${config.from_address || config.username})`;
-                            if (config.is_default) {
-                                option.textContent += ' - Default';
-                                option.selected = true;
-                            }
-                            select.appendChild(option);
-                        });
-                    } else {
-                        select.innerHTML = '<option value="">No SMTP configurations available</option>';
-                    }
-                } catch (error) {
-                    console.error('Error loading SMTP configurations:', error);
-                    this.showAlert('Failed to load SMTP configurations: ' + error.message, 'danger');
-                    select.innerHTML = '<option value="">Error loading SMTP configurations</option>';
-                }
-            }
-
-            async loadN8nSenders() {
-                const select = document.getElementById('n8nSenderSelect');
-                if (!select) return;
-
-                try {
-                    const response = await fetch('/api/senders', {
-                        headers: this.getAuthHeaders()
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-
-                    if (data.success && data.senders && data.senders.length > 0) {
-                        select.innerHTML = '<option value="">Select a sender...</option>';
-                        data.senders.forEach(sender => {
-                            const option = document.createElement('option');
-                            option.value = sender.id;
-                            option.textContent = `${sender.name} (${sender.email})`;
-                            option.dataset.email = sender.email;
-                            select.appendChild(option);
-                        });
-                    } else {
-                        select.innerHTML = '<option value="">No senders available</option>';
-                    }
-                } catch (error) {
-                    console.error('Error loading senders:', error);
-                    this.showAlert('Failed to load senders: ' + error.message, 'danger');
-                    select.innerHTML = '<option value="">Error loading senders</option>';
-                }
-            }
-
-            async sendN8nMail() {
-                const form = document.getElementById('n8nmailForm');
-                const submitBtn = document.getElementById('n8nSubmitBtn');
+            showTemplatePreview(htmlContent) {
+                const previewContainer = document.getElementById('templatePreviewContainer');
+                const previewDiv = document.getElementById('templatePreview');
+                const messageTextarea = document.getElementById('message');
+                const toggleBtn = document.getElementById('toggleEditBtn');
                 
-                // Disable form
-                form.classList.add('loading');
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-
-                try {
-                    // Validate required fields
-                    const smtpConfigId = document.getElementById('n8nSmtpConfigSelect').value;
-                    const senderId = document.getElementById('n8nSenderSelect').value;
-                    const subject = document.getElementById('n8nSubject').value.trim();
-                    const message = document.getElementById('n8nMessage').value.trim();
+                if (previewContainer && previewDiv) {
+                    // Set the HTML content in preview
+                    previewDiv.innerHTML = htmlContent;
                     
-                    // Validation checks
-                    if (!smtpConfigId) {
-                        this.showAlert('Please select an SMTP Configuration', 'warning');
-                        form.classList.remove('loading');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-                        return;
-                    }
+                    // Show preview, hide textarea
+                    previewContainer.style.display = 'block';
+                    messageTextarea.style.display = 'none';
                     
-                    if (!senderId) {
-                        this.showAlert('Please select a Sender', 'warning');
-                        form.classList.remove('loading');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-                        return;
+                    // Update button text
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
                     }
-                    
-                    if (!subject) {
-                        this.showAlert('Please enter an email subject', 'warning');
-                        form.classList.remove('loading');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-                        return;
-                    }
-                    
-                    if (!message) {
-                        this.showAlert('Please enter an email message', 'warning');
-                        form.classList.remove('loading');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-                        return;
-                    }
-                    
-                    // Get sender details
-                    const senderSelect = document.getElementById('n8nSenderSelect');
-                    const selectedSenderOption = senderSelect.options[senderSelect.selectedIndex];
-                    const senderName = selectedSenderOption ? selectedSenderOption.textContent.split('(')[0].trim() : '';
-                    const senderEmail = selectedSenderOption ? selectedSenderOption.textContent.match(/\(([^)]+)\)/)?.[1] || '' : '';
-                    
-                    // Check if CSV data is available
-                    let recipients = '';
-                    if (this.n8nCsvData && this.n8nCsvData.length > 0) {
-                        // Convert CSV data to newline-separated string
-                        recipients = this.n8nCsvData.map(item => item.email).join('\n');
-                    } else {
-                        // Use manual entry if no CSV data
-                        recipients = document.getElementById('n8nRecipients').value.trim();
-                    }
-
-                    if (!recipients) {
-                        this.showAlert('Please provide recipients either manually or via CSV upload', 'warning');
-                        form.classList.remove('loading');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-                        return;
-                    }
-
-                    // Prepare data for n8n webhook
-                    const n8nWebhookData = {
-                        sender_id: senderId,
-                        sender_name: senderName,
-                        sender_email: senderEmail,
-                        subject: subject,
-                        message: message,
-                        recipients: recipients,
-                        smtp_configuration_id: smtpConfigId
-                    };
-
-                    // Send data to n8n webhook via backend proxy (avoids CORS)
-                    try {
-                        console.log('Sending data to n8n webhook:', n8nWebhookData);
-                        
-                        const webhookResponse = await fetch('/api/n8n-webhook', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': this.getAuthToken()
-                            },
-                            body: JSON.stringify(n8nWebhookData)
-                        });
-                        
-                        const webhookData = await webhookResponse.json();
-                        
-                        if (webhookData.success) {
-                            this.showAlert(webhookData.message || 'Data sent to n8n successfully!', 'success');
-                            
-                            // Reset form after successful webhook call
-                            form.reset();
-                            this.n8nCsvData = null;
-                            document.getElementById('n8nCsvFile').value = '';
-                            document.getElementById('n8nCsvPreview').style.display = 'none';
-                            // Switch to manual tab
-                            const manualTab = document.getElementById('n8n-manual-tab');
-                            if (manualTab) {
-                                manualTab.click();
-                            }
-                            // Reload dropdowns
-                            await this.loadN8nMailData();
-                        } else {
-                            this.showAlert(webhookData.message || 'Failed to send data to n8n', 'danger');
-                            console.error('Webhook error:', webhookData);
-                        }
-                    } catch (webhookError) {
-                        console.error('Error sending to n8n webhook:', webhookError);
-                        const errorMessage = webhookError.message || 'Unknown error occurred';
-                        this.showAlert(`Error connecting to n8n webhook: ${errorMessage}`, 'danger');
-                    }
-                } catch (error) {
-                    console.error('Error sending data to n8n:', error);
-                    this.showAlert('An error occurred: ' + error.message, 'danger');
-                } finally {
-                    // Re-enable form
-                    form.classList.remove('loading');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
                 }
             }
 
-            // N8nMail CSV handling functions
-            handleN8nCsvFile(file) {
-                if (!file) return;
-                
-                const fileExtension = file.name.split('.').pop().toLowerCase();
-                
-                if (fileExtension === 'csv') {
-                    this.handleN8nCsvFileContent(file);
-                } else if (fileExtension === 'xls' || fileExtension === 'xlsx') {
-                    this.showAlert('Excel files are not supported. Please convert to CSV format first.', 'warning');
-                    document.getElementById('n8nCsvFile').value = '';
-                    return;
-                } else {
-                    this.showAlert('Invalid file type. Please upload a CSV file.', 'danger');
-                    document.getElementById('n8nCsvFile').value = '';
-                    return;
-                }
-            }
-
-            handleN8nCsvFileContent(file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const csvData = this.parseCsv(e.target.result);
-                        this.displayN8nCsvPreview(csvData);
-                    } catch (error) {
-                        this.showAlert('Error parsing CSV file: ' + error.message, 'danger');
-                        document.getElementById('n8nCsvFile').value = '';
-                    }
-                };
-                reader.readAsText(file);
-            }
-
-            displayN8nCsvPreview(data) {
-                const previewDiv = document.getElementById('n8nCsvPreview');
-                const previewBody = document.getElementById('n8nCsvPreviewBody');
-                const countSpan = document.getElementById('n8nCsvCount');
-
-                // Validate emails
-                const validData = data.filter(item => {
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    return emailRegex.test(item.email);
-                });
-
-                if (validData.length === 0) {
-                    this.showAlert('No valid email addresses found in CSV', 'danger');
-                    previewDiv.style.display = 'none';
-                    return;
-                }
-
-                if (validData.length > 500) {
-                    this.showAlert('CSV contains more than 500 recipients. Only the first 500 will be used.', 'warning');
-                    validData.splice(500);
-                }
-
-                // Display preview (show first 10 rows)
-                previewBody.innerHTML = '';
-                const previewRows = validData.slice(0, 10);
-                
-                previewRows.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${item.email}</td>
-                        <td>${item.name || '-'}</td>
-                    `;
-                    previewBody.appendChild(row);
-                });
-
-                if (validData.length > 10) {
-                    const moreRow = document.createElement('tr');
-                    moreRow.innerHTML = `
-                        <td colspan="2" class="text-center text-muted">
-                            ... and ${validData.length - 10} more rows
-                        </td>
-                    `;
-                    previewBody.appendChild(moreRow);
-                }
-
-                countSpan.textContent = validData.length;
-                previewDiv.style.display = 'block';
-
-                // Store the parsed data for form submission
-                this.n8nCsvData = validData;
-            }
-
-            downloadN8nSampleCsv() {
-                const csvContent = "email,name\njohn@example.com,John Doe\njane@example.com,Jane Smith";
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'sample_recipients.csv';
-                a.click();
-                window.URL.revokeObjectURL(url);
-            }
-
-            autoSelectN8nSmtpConfig(senderEmail) {
-                const smtpSelect = document.getElementById('n8nSmtpConfigSelect');
-                if (!smtpSelect) return;
-
-                // Find SMTP config that matches sender email
-                for (let i = 0; i < smtpSelect.options.length; i++) {
-                    const option = smtpSelect.options[i];
-                    if (option.textContent.includes(senderEmail)) {
-                        option.selected = true;
-                        break;
-                    }
-                }
-            }
         }
 
         // Force text color visibility
@@ -3419,11 +2813,18 @@
                 originalShowTab(tabName);
                 setTimeout(forceTextVisibility, 100); // Small delay to ensure DOM is updated
                 
-                // Refresh dashboard data when switching to dashboard tab
+                // Refresh dashboard data when switching to dashboard tab (only if not already refreshing)
                 if (tabName === 'dashboard') {
                     const campaignManager = window.campaignManager;
                     if (campaignManager) {
-                        campaignManager.loadDashboardData();
+                        // Only refresh once, don't restart the interval
+                        campaignManager.refreshDashboardData();
+                    }
+                } else {
+                    // Stop refreshing when switching away from dashboard
+                    const campaignManager = window.campaignManager;
+                    if (campaignManager) {
+                        campaignManager.stopDashboardRefresh();
                     }
                 }
             };
@@ -3436,7 +2837,38 @@
             });
         });
 
-        // Email Preview Functionality
+        // Toggle between preview and edit mode
+        function toggleMessageEdit() {
+            const previewContainer = document.getElementById('templatePreviewContainer');
+            const messageTextarea = document.getElementById('message');
+            const toggleBtn = document.getElementById('toggleEditBtn');
+            
+            if (previewContainer && messageTextarea) {
+                if (previewContainer.style.display === 'none' || previewContainer.style.display === '') {
+                    // Switch to preview mode
+                    const htmlContent = messageTextarea.value;
+                    if (htmlContent.trim()) {
+                        document.getElementById('templatePreview').innerHTML = htmlContent;
+                        previewContainer.style.display = 'block';
+                        messageTextarea.style.display = 'none';
+                        if (toggleBtn) {
+                            toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
+                        }
+                    } else {
+                        alert('Please enter some HTML content first.');
+                    }
+                } else {
+                    // Switch to edit mode
+                    previewContainer.style.display = 'none';
+                    messageTextarea.style.display = 'block';
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Preview';
+                    }
+                }
+            }
+        }
+
+        // Email Preview Functionality (for modal preview)
         function showEmailPreview() {
             const subject = document.getElementById('subject').value || 'No Subject';
             const message = document.getElementById('message').value || 'No message content';
@@ -3448,6 +2880,196 @@
             // Show modal
             const previewModal = new bootstrap.Modal(document.getElementById('emailPreviewModal'));
             previewModal.show();
+        }
+
+        // Show Create SMTP Modal
+        function showCreateSmtpModal() {
+            const modal = new bootstrap.Modal(document.getElementById('createSmtpModal'));
+            modal.show();
+            
+            // Clear form when opening
+            document.getElementById('createSmtpForm').reset();
+        }
+
+        // Save New SMTP Configuration
+        async function saveNewSmtp() {
+            const name = document.getElementById('smtpName').value.trim();
+            const host = document.getElementById('smtpHost').value.trim();
+            const port = document.getElementById('smtpPort').value.trim();
+            const username = document.getElementById('smtpUsername').value.trim();
+            const password = document.getElementById('smtpPassword').value.trim();
+            const encryption = document.getElementById('smtpEncryption').value;
+            const fromName = document.getElementById('smtpFromName').value.trim();
+            const fromAddress = document.getElementById('smtpFromAddress').value.trim();
+            const description = document.getElementById('smtpDescription').value.trim();
+            const isDefault = document.getElementById('smtpIsDefault').checked;
+            
+            // Validation
+            if (!name || !host || !port || !username || !password || !fromName || !fromAddress) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            if (!/^\d+$/.test(port) || parseInt(port) < 1 || parseInt(port) > 65535) {
+                alert('Please enter a valid port number (1-65535)');
+                return;
+            }
+            
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromAddress)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/smtp-configurations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        host: host,
+                        port: parseInt(port),
+                        username: username,
+                        password: password,
+                        encryption: encryption,
+                        from_name: fromName,
+                        from_address: fromAddress,
+                        description: description || null,
+                        is_default: isDefault,
+                        is_active: true
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createSmtpModal'));
+                    modal.hide();
+                    
+                    // Show success message
+                    if (window.campaignManager) {
+                        window.campaignManager.showAlert('SMTP configuration created successfully! A corresponding sender has also been created.', 'success');
+                    }
+                    
+                    // Reload SMTP configurations dropdown
+                    if (window.campaignManager) {
+                        await window.campaignManager.loadSmtpConfigurations();
+                    }
+                    
+                    // Reload senders dropdown
+                    if (window.campaignManager) {
+                        await window.campaignManager.loadSenders();
+                    }
+                    
+                    // Select the newly created SMTP
+                    const smtpSelect = document.getElementById('smtpConfigSelect');
+                    if (smtpSelect && data.configuration) {
+                        smtpSelect.value = data.configuration.id;
+                    }
+                    
+                    // Auto-select matching sender based on from_address
+                    const senderSelect = document.getElementById('senderSelect');
+                    if (senderSelect && window.campaignManager) {
+                        // Wait a bit for senders to reload, then auto-select
+                        setTimeout(() => {
+                            const options = senderSelect.querySelectorAll('option');
+                            for (let option of options) {
+                                if (option.value && option.textContent.includes(fromAddress)) {
+                                    senderSelect.value = option.value;
+                                    break;
+                                }
+                            }
+                        }, 500);
+                    }
+                } else {
+                    const errorMsg = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Unknown error');
+                    alert('Failed to create SMTP configuration: ' + errorMsg);
+                }
+            } catch (error) {
+                console.error('Error creating SMTP configuration:', error);
+                alert('Error creating SMTP configuration: ' + error.message);
+            }
+        }
+
+        // Show Create Template Modal
+        function showCreateTemplateModal() {
+            const modal = new bootstrap.Modal(document.getElementById('createTemplateModal'));
+            modal.show();
+            
+            // Clear form when opening
+            document.getElementById('createTemplateForm').reset();
+        }
+
+        // Save New Template
+        async function saveNewTemplate() {
+            const form = document.getElementById('createTemplateForm');
+            const name = document.getElementById('templateName').value.trim();
+            const subject = document.getElementById('templateSubject').value.trim();
+            const body = document.getElementById('templateBody').value.trim();
+            const description = document.getElementById('templateDescription').value.trim();
+            
+            // Validation
+            if (!name) {
+                alert('Please enter a template name');
+                return;
+            }
+            
+            if (!body) {
+                alert('Please enter template HTML code');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/email-templates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        subject: subject || null,
+                        body: body,
+                        description: description || null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createTemplateModal'));
+                    modal.hide();
+                    
+                    // Show success message
+                    if (window.campaignManager) {
+                        window.campaignManager.showAlert('Template created successfully!', 'success');
+                    }
+                    
+                    // Reload templates dropdown
+                    if (window.campaignManager) {
+                        await window.campaignManager.loadEmailTemplates();
+                    }
+                    
+                    // Select the newly created template
+                    const templateSelect = document.getElementById('templateSelect');
+                    if (templateSelect && data.template) {
+                        templateSelect.value = data.template.id;
+                        // Trigger change event to load the template
+                        templateSelect.dispatchEvent(new Event('change'));
+                    }
+                } else {
+                    alert('Failed to create template: ' + (data.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error creating template:', error);
+                alert('Error creating template: ' + error.message);
+            }
         }
 
         // Toggle Campaign Details
@@ -3468,6 +3090,160 @@
             }
         }
     </script>
+
+    <!-- Create SMTP Configuration Modal -->
+    <div class="modal fade" id="createSmtpModal" tabindex="-1" aria-labelledby="createSmtpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                    <h5 class="modal-title" id="createSmtpModalLabel">
+                        <i class="fas fa-server"></i> Create New SMTP Configuration
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createSmtpForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpName" class="form-label">Configuration Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="smtpName" name="name" required placeholder="e.g., Gmail SMTP">
+                                    <div class="form-text">Give your SMTP configuration a name</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpHost" class="form-label">SMTP Host <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="smtpHost" name="host" required placeholder="e.g., smtp.gmail.com">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label for="smtpPort" class="form-label">Port <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="smtpPort" name="port" required placeholder="587" min="1" max="65535">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label for="smtpEncryption" class="form-label">Encryption <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="smtpEncryption" name="encryption" required>
+                                        <option value="tls" selected>TLS</option>
+                                        <option value="ssl">SSL</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="smtpIsDefault" name="is_default">
+                                        <label class="form-check-label" for="smtpIsDefault">
+                                            Set as Default
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpUsername" class="form-label">Username <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="smtpUsername" name="username" required placeholder="Your SMTP username">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpPassword" class="form-label">Password <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="smtpPassword" name="password" required placeholder="Your SMTP password">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpFromName" class="form-label">From Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="smtpFromName" name="from_name" required placeholder="e.g., Your Company Name">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="smtpFromAddress" class="form-label">From Email Address <span class="text-danger">*</span></label>
+                                    <input type="email" class="form-control" id="smtpFromAddress" name="from_address" required placeholder="e.g., noreply@example.com">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="smtpDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="smtpDescription" name="description" rows="2" placeholder="Optional description for this SMTP configuration"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveNewSmtp()">
+                        <i class="fas fa-save"></i> Save SMTP Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Template Modal -->
+    <div class="modal fade" id="createTemplateModal" tabindex="-1" aria-labelledby="createTemplateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                    <h5 class="modal-title" id="createTemplateModalLabel">
+                        <i class="fas fa-plus-circle"></i> Create New Email Template
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createTemplateForm">
+                        <div class="form-group mb-3">
+                            <label for="templateName" class="form-label">Template Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="templateName" name="name" required placeholder="Enter template name">
+                            <div class="form-text">Give your template a descriptive name</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="templateSubject" class="form-label">Email Subject</label>
+                            <input type="text" class="form-control" id="templateSubject" name="subject" placeholder="Enter email subject (optional)">
+                            <div class="form-text">Default subject line for this template</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="templateBody" class="form-label">Template Code (HTML) <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="templateBody" name="body" rows="12" required placeholder="Paste your HTML email template code here..." style="font-family: 'Courier New', monospace;"></textarea>
+                            <div class="form-text">Enter the complete HTML code for your email template</div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="templateDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="templateDescription" name="description" rows="2" placeholder="Optional description for this template"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveNewTemplate()">
+                        <i class="fas fa-save"></i> Save Template
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Email Preview Modal -->
     <div class="modal fade" id="emailPreviewModal" tabindex="-1" aria-labelledby="emailPreviewModalLabel" aria-hidden="true">

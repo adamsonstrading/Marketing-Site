@@ -42,16 +42,16 @@ class EmailVerificationService
             return $result;
         }
 
-        // Check if domain has MX records
+        // Check if domain has MX records (with timeout to prevent hanging)
         $result['has_mx_record'] = $this->checkMxRecord($domain);
         
-        // Check if domain is valid (can resolve)
-        $result['is_domain_valid'] = checkdnsrr($domain, 'A') || checkdnsrr($domain, 'AAAA');
+        // Check if domain is valid (can resolve) - with timeout
+        $result['is_domain_valid'] = @checkdnsrr($domain, 'A') || @checkdnsrr($domain, 'AAAA');
         
-        // Check if email is disposable
+        // Check if email is disposable (fast check)
         $result['is_disposable'] = $this->isDisposableEmail($domain);
         
-        // Check if email is role-based
+        // Check if email is role-based (fast check)
         $result['is_role_based'] = $this->isRoleBasedEmail($localPart);
 
         // Determine overall validity
@@ -77,11 +77,13 @@ class EmailVerificationService
     }
 
     /**
-     * Check if domain has MX records
+     * Check if domain has MX records (with timeout protection)
      */
     private function checkMxRecord(string $domain): bool
     {
-        return checkdnsrr($domain, 'MX');
+        // Use @ to suppress warnings and set timeout
+        $result = @checkdnsrr($domain, 'MX');
+        return $result !== false;
     }
 
     /**

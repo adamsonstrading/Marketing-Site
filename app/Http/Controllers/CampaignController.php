@@ -76,7 +76,8 @@ class CampaignController extends Controller
                 }
             }
 
-            // Verify emails if verification is enabled
+            // Quick email verification (basic syntax check only for speed)
+            // Full verification happens in background via jobs
             $verificationService = app(EmailVerificationService::class);
             $verifiedRecipients = [];
             $verificationStats = [
@@ -87,7 +88,25 @@ class CampaignController extends Controller
             ];
 
             foreach ($recipientData as $recipient) {
-                $verification = $verificationService->verify($recipient['email']);
+                // Quick syntax check only (fast)
+                $isValidSyntax = filter_var($recipient['email'], FILTER_VALIDATE_EMAIL) !== false;
+                
+                // For large batches, skip slow DNS checks during creation
+                // Full verification will happen in background
+                if (count($recipientData) > 10) {
+                    // Skip DNS checks for speed - just basic validation
+                    $verification = [
+                        'is_valid' => $isValidSyntax,
+                        'is_disposable' => false,
+                        'is_role_based' => false,
+                        'has_mx_record' => true, // Assume true, verify in background
+                        'is_domain_valid' => true, // Assume true, verify in background
+                        'details' => $isValidSyntax ? ['Basic syntax valid'] : ['Invalid email syntax']
+                    ];
+                } else {
+                    // For small batches, do full verification
+                    $verification = $verificationService->verify($recipient['email']);
+                }
                 
                 $verifiedRecipients[] = [
                     'email' => $recipient['email'],
@@ -148,8 +167,37 @@ class CampaignController extends Controller
                 ->pluck('id')
                 ->toArray();
 
-            foreach ($recipientIds as $recipientId) {
-                SendRecipientJob::dispatch($recipientId)->onQueue('emails');
+            // Update campaign status to sending if there are recipients
+            if (count($recipientIds) > 0) {
+                $campaign->update(['status' => 'sending']);
+                
+                // Dispatch all jobs to queue (async - don't wait for processing)
+                foreach ($recipientIds as $recipientId) {
+                    SendRecipientJob::dispatch($recipientId)
+                        ->onQueue('emails')
+                        ->delay(now()->addSeconds(rand(1, 2))); // Small random delay to stagger
+                }
+                
+                // Trigger immediate queue processing in background (non-blocking)
+                // This ensures emails start processing right away without blocking the HTTP response
+                if (count($recipientIds) > 0) {
+                    // Use exec to run queue processing in background (Windows compatible)
+                    $maxJobs = min(count($recipientIds) + 10, 50);
+                    $command = sprintf(
+                        'php "%s" queue:auto-process --max-jobs=%d > nul 2>&1',
+                        base_path('artisan'),
+                        $maxJobs
+                    );
+                    
+                    // Execute in background (non-blocking)
+                    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                        // Windows
+                        pclose(popen("start /B " . $command, "r"));
+                    } else {
+                        // Linux/Unix
+                        exec($command . " &");
+                    }
+                }
             }
 
             DB::commit();
@@ -273,10 +321,18 @@ class CampaignController extends Controller
         $pending = $statusCounts['pending'] ?? 0;
 
         // Update campaign status based on recipient statuses
+        // Only update if status needs to change
+        $newStatus = $campaign->status;
         if ($pending > 0) {
-            $campaign->update(['status' => 'sending']);
-        } elseif ($sent + $failed >= $total) {
-            $campaign->update(['status' => 'completed']);
+            $newStatus = 'sending';
+        } elseif ($sent + $failed >= $total && $total > 0) {
+            $newStatus = 'completed';
+        } elseif ($total == 0) {
+            $newStatus = 'completed';
+        }
+        
+        if ($newStatus !== $campaign->status) {
+            $campaign->update(['status' => $newStatus]);
         }
 
         return response()->json([
@@ -287,12 +343,12 @@ class CampaignController extends Controller
             'sent' => $sent,
             'failed' => $failed,
             'pending' => $pending,
-            'recent_recipients' => $campaign->recipients->map(function($recipient) {
+            'recent_recipients' => $campaign->recipients()->orderBy('created_at', 'desc')->limit(10)->get()->map(function($recipient) {
                 return [
                     'email' => $recipient->email,
                     'status' => $recipient->status,
                     'last_error' => $recipient->last_error,
-                    'sent_at' => $recipient->sent_at,
+                    'sent_at' => $recipient->sent_at ? $recipient->sent_at->format('M d, Y H:i:s') : null,
                 ];
             })
         ]);
@@ -565,81 +621,4 @@ class CampaignController extends Controller
         return $result;
     }
 
-    /**
-     * Proxy request to n8n webhook (server-side to avoid CORS)
-     */
-    public function sendToN8n(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'sender_id' => 'required',
-            'sender_name' => 'nullable|string',
-            'sender_email' => 'nullable|string|email',
-            'subject' => 'required|string',
-            'message' => 'required|string',
-            'recipients' => 'required|string',
-            'smtp_configuration_id' => 'required',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $webhookUrl = 'https://humayounai.app.n8n.cloud/webhook-test/mail';
-            
-            $data = [
-                'sender_id' => $request->sender_id,
-                'sender_name' => $request->sender_name,
-                'sender_email' => $request->sender_email,
-                'subject' => $request->subject,
-                'message' => $request->message,
-                'recipients' => $request->recipients,
-                'smtp_configuration_id' => $request->smtp_configuration_id,
-            ];
-
-            $response = Http::timeout(30)->post($webhookUrl, $data);
-
-            $statusCode = $response->status();
-
-            if ($response->successful()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Data sent to n8n successfully',
-                    'status' => $statusCode,
-                    'response' => $response->json() ?? $response->body()
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'n8n webhook returned an error',
-                    'status' => $statusCode,
-                    'response' => $response->body()
-                ], $statusCode);
-            }
-
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            \Log::error('N8n webhook connection error', [
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to connect to n8n webhook. Please check the webhook URL and network connection.'
-            ], 500);
-        } catch (\Exception $e) {
-            \Log::error('N8n webhook exception', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
-        }
-    }
 }
