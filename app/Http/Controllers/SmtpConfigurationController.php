@@ -6,6 +6,7 @@ use App\Models\SmtpConfiguration;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class SmtpConfigurationController extends Controller
 {
@@ -83,6 +84,28 @@ class SmtpConfigurationController extends Controller
             // If this is set as default, make it the only default
             if ($request->boolean('is_default')) {
                 $configuration->setAsDefault();
+            }
+
+            // Also create a corresponding Sender entry so it appears in sender dropdown
+            // Only create if a sender with the same email doesn't already exist
+            try {
+                $existingSender = \App\Models\Sender::where('email', $request->from_address)->first();
+                if (!$existingSender) {
+                    \App\Models\Sender::create([
+                        'name' => $request->from_name,
+                        'email' => $request->from_address,
+                        'smtp_host' => $request->host,
+                        'smtp_port' => $request->port,
+                        'smtp_username' => $request->username,
+                        'smtp_password' => $request->password,
+                        'smtp_encryption' => $request->encryption,
+                        'from_name' => $request->from_name,
+                        'from_address' => $request->from_address,
+                    ]);
+                }
+            } catch (\Exception $senderException) {
+                // Log but don't fail the SMTP creation if sender creation fails
+                Log::warning('Failed to create sender for SMTP configuration: ' . $senderException->getMessage());
             }
 
             return response()->json([
