@@ -165,14 +165,18 @@ class SendRecipientJob implements ShouldQueue
             // Prepare dynamic variables for email template
             $firstName = '';
             $lastName = '';
-            if ($recipient->name) {
-                $nameParts = explode(' ', trim($recipient->name), 2);
+            $fullName = '';
+            
+            // Only process name if it exists and is not empty
+            if ($recipient->name && trim($recipient->name) !== '') {
+                $fullName = trim($recipient->name);
+                $nameParts = explode(' ', $fullName, 2);
                 $firstName = $nameParts[0] ?? '';
                 $lastName = $nameParts[1] ?? '';
             }
 
             $variables = [
-                'name' => $recipient->name ?? $recipient->email,
+                'name' => $fullName, // Empty string if no name, otherwise use the name
                 'email' => $recipient->email,
                 'first_name' => $firstName,
                 'last_name' => $lastName,

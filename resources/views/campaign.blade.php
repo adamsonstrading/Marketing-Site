@@ -10,6 +10,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- TinyMCE Rich Text Editor (Free CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js"></script>
     <style>
         :root {
             --primary-bg: #1a1a1a;
@@ -453,6 +455,81 @@
 
         .form-control::placeholder {
             color: var(--text-secondary) !important;
+        }
+
+        /* TinyMCE Rich Text Editor Styles */
+        #richTextEditorContainer {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* TinyMCE Theme Customization */
+        .tox-tinymce {
+            border: none !important;
+            border-radius: 10px !important;
+        }
+
+        .tox .tox-editor-header {
+            background: var(--secondary-bg) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        .tox .tox-toolbar,
+        .tox .tox-toolbar__overflow,
+        .tox .tox-toolbar__primary {
+            background: var(--secondary-bg) !important;
+        }
+
+        .tox .tox-edit-area__iframe {
+            background: var(--card-bg) !important;
+        }
+
+        /* Fix TinyMCE iframe background to match theme */
+        .tox .tox-edit-area__iframe iframe {
+            background-color: var(--card-bg) !important;
+        }
+
+        /* Fix TinyMCE content body background */
+        .tox .tox-edit-area__iframe body.mce-content-body {
+            background-color: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .tox .tox-menubar {
+            background: var(--secondary-bg) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        .tox .tox-menu {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+
+        .tox .tox-menu__label {
+            color: var(--text-primary) !important;
+        }
+
+        .tox .tox-button {
+            color: var(--text-primary) !important;
+        }
+
+        .tox .tox-button:hover {
+            background: var(--card-bg) !important;
+        }
+
+        /* Light theme specific overrides */
+        [data-theme="light"] .tox .tox-edit-area__iframe {
+            background: #ffffff !important;
+        }
+
+        [data-theme="light"] .tox .tox-edit-area__iframe iframe {
+            background-color: #ffffff !important;
+        }
+
+        [data-theme="light"] .tox .tox-edit-area__iframe body.mce-content-body {
+            background-color: #ffffff !important;
+            color: #212529 !important;
         }
 
         /* Force text color for all input types */
@@ -1410,10 +1487,15 @@
                                     <div class="form-group">
                                         <label for="message" class="form-label">Message (HTML allowed)</label>
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="form-text">Select a template above to preview it, or enter custom HTML below.</span>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleEditBtn" onclick="toggleMessageEdit()">
-                                                <i class="fas fa-code"></i> Edit HTML
-                                            </button>
+                                            <span class="form-text">Select a template above to preview it, or use the rich text editor below.</span>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleRichTextBtn" onclick="toggleRichTextEditor()">
+                                                    <i class="fas fa-edit"></i> Rich Text Editor
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleEditBtn" onclick="toggleMessageEdit()">
+                                                    <i class="fas fa-code"></i> Edit HTML
+                                                </button>
+                                            </div>
                                         </div>
                                         
                                         <!-- Template Preview Container -->
@@ -1423,7 +1505,12 @@
                                             </div>
                                         </div>
                                         
-                                        <!-- Textarea for storing HTML code (hidden when preview is shown) -->
+                                        <!-- Rich Text Editor Container -->
+                                        <div id="richTextEditorContainer" style="display: none;">
+                                            <!-- TinyMCE will be initialized here -->
+                                        </div>
+                                        
+                                        <!-- Textarea for storing HTML code (hidden when preview or rich text editor is shown) -->
                                         <textarea class="form-control" id="message" name="body" rows="6" required placeholder="Enter your email message... Or select a template above to preview"></textarea>
                                     </div>
 
@@ -1449,8 +1536,11 @@
                                             <!-- Manual Entry Tab -->
                                             <div class="tab-pane fade show active" id="manual" role="tabpanel">
                                                 <textarea class="form-control mt-3" id="recipients" name="recipients" rows="4" 
-                                                    placeholder="Enter email addresses, one per line&#10;example@domain.com&#10;another@domain.com"></textarea>
-                                                <div class="form-text">One email address per line. Maximum 500 recipients.</div>
+                                                    placeholder="Enter email addresses, one per line&#10;example@domain.com&#10;another@domain.com,John Doe"></textarea>
+                                                <div class="form-text">
+                                                    One email address per line. Maximum 500 recipients.<br>
+                                                    <small><strong>Tip:</strong> You can include names by using format: <code>email@domain.com,Name</code> (e.g., <code>john@example.com,John Doe</code>). Names will be used for dynamic variables like @{{name}} in your email template.</small>
+                                                </div>
                                             </div>
                                             
                                             <!-- CSV Upload Tab -->
@@ -1798,8 +1888,20 @@
                             document.getElementById('subject').value = data.template.subject;
                         }
                         
-                        // Store HTML code in hidden textarea
-                        document.getElementById('message').value = data.template.body;
+                        // Store HTML code in textarea
+                        const messageTextarea = document.getElementById('message');
+                        if (messageTextarea) {
+                            messageTextarea.value = data.template.body;
+                        }
+                        
+                        // If Rich Text Editor is active, load content there too
+                        if (isRichTextMode && typeof tinymce !== 'undefined') {
+                            const editor = tinymce.get('richTextEditor');
+                            if (editor) {
+                                editor.setContent(data.template.body);
+                                syncRichTextToTextarea();
+                            }
+                        }
                         
                         // Show preview instead of code
                         this.showTemplatePreview(data.template.body);
@@ -2317,13 +2419,18 @@
                         if (templateId) {
                             this.loadTemplateContent(templateId);
                         } else {
-                            // No template selected - show textarea, hide preview
+                            // No template selected - show textarea, hide preview and rich text editor
                             const previewContainer = document.getElementById('templatePreviewContainer');
+                            const richTextContainer = document.getElementById('richTextEditorContainer');
                             const messageTextarea = document.getElementById('message');
                             const toggleBtn = document.getElementById('toggleEditBtn');
+                            const toggleRichTextBtn = document.getElementById('toggleRichTextBtn');
                             
                             if (previewContainer) {
                                 previewContainer.style.display = 'none';
+                            }
+                            if (richTextContainer) {
+                                richTextContainer.style.display = 'none';
                             }
                             if (messageTextarea) {
                                 messageTextarea.style.display = 'block';
@@ -2332,6 +2439,11 @@
                             if (toggleBtn) {
                                 toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
                             }
+                            if (toggleRichTextBtn) {
+                                toggleRichTextBtn.classList.remove('active');
+                                toggleRichTextBtn.innerHTML = '<i class="fas fa-edit"></i> Rich Text Editor';
+                            }
+                            isRichTextMode = false;
                         }
                     });
                 }
@@ -2525,6 +2637,11 @@
                 const form = document.getElementById('campaignForm');
                 const submitBtn = document.getElementById('submitBtn');
                 
+                // Sync Rich Text Editor content to textarea if active
+                if (isRichTextMode && typeof tinymce !== 'undefined') {
+                    syncRichTextToTextarea();
+                }
+                
                 // Disable form
                 form.classList.add('loading');
                 submitBtn.disabled = true;
@@ -2535,9 +2652,18 @@
                     
                     // Check if CSV data is available
                     if (this.csvData && this.csvData.length > 0) {
-                        // Convert CSV data to newline-separated string
-                        const csvEmails = this.csvData.map(item => item.email).join('\n');
-                        formData.set('recipients', csvEmails);
+                        // Convert CSV data to newline-separated string with email,name format
+                        // This preserves names for dynamic variable replacement
+                        const csvRecipients = this.csvData.map(item => {
+                            if (item.name && item.name.trim()) {
+                                // Include name if present
+                                return `${item.email},${item.name.trim()}`;
+                            } else {
+                                // Just email if no name
+                                return item.email;
+                            }
+                        }).join('\n');
+                        formData.set('recipients', csvRecipients);
                     } else {
                         // Use manual entry if no CSV data
                         const manualRecipients = document.getElementById('recipients').value;
@@ -2716,19 +2842,25 @@
                 const previewContainer = document.getElementById('templatePreviewContainer');
                 const previewDiv = document.getElementById('templatePreview');
                 const messageTextarea = document.getElementById('message');
+                const richTextContainer = document.getElementById('richTextEditorContainer');
                 const toggleBtn = document.getElementById('toggleEditBtn');
+                const toggleRichTextBtn = document.getElementById('toggleRichTextBtn');
                 
                 if (previewContainer && previewDiv) {
                     // Set the HTML content in preview
                     previewDiv.innerHTML = htmlContent;
                     
-                    // Show preview, hide textarea
+                    // Show preview, hide textarea and rich text editor
                     previewContainer.style.display = 'block';
-                    messageTextarea.style.display = 'none';
+                    if (messageTextarea) messageTextarea.style.display = 'none';
+                    if (richTextContainer) richTextContainer.style.display = 'none';
                     
-                    // Update button text
+                    // Update button states
                     if (toggleBtn) {
                         toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
+                    }
+                    if (toggleRichTextBtn) {
+                        toggleRichTextBtn.classList.remove('active');
                     }
                 }
             }
@@ -2794,6 +2926,186 @@
             });
         }
 
+        // TinyMCE Rich Text Editor Instance
+        let tinymceInstance = null;
+        let isRichTextMode = false;
+
+        // Initialize TinyMCE Rich Text Editor
+        function initializeTinyMCE() {
+            const container = document.getElementById('richTextEditorContainer');
+            if (!container) return;
+
+            // Create textarea for TinyMCE
+            if (!document.getElementById('richTextEditor')) {
+                const textarea = document.createElement('textarea');
+                textarea.id = 'richTextEditor';
+                textarea.name = 'richTextEditor';
+                container.appendChild(textarea);
+            }
+
+            // Initialize TinyMCE
+            if (typeof tinymce !== 'undefined') {
+                // Detect current theme
+                const isDarkTheme = document.documentElement.getAttribute('data-theme') !== 'light';
+                const bgColor = isDarkTheme ? '#333333' : '#ffffff';
+                const textColor = isDarkTheme ? '#ffffff' : '#212529';
+                const toolbarBg = isDarkTheme ? '#2d2d2d' : '#ffffff';
+                
+                tinymce.init({
+                    selector: '#richTextEditor',
+                    height: 500,
+                    menubar: true,
+                    plugins: [
+                        'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                        'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                        'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+                    ],
+                    toolbar: 'undo redo | formatselect | ' +
+                        'bold italic backcolor | alignleft aligncenter ' +
+                        'alignright alignjustify | bullist numlist outdent indent | ' +
+                        'removeformat | help | code',
+                    content_style: `body { 
+                        font-family: Inter, Arial, sans-serif; 
+                        font-size: 14px; 
+                        color: ${textColor}; 
+                        background: ${bgColor}; 
+                        margin: 10px;
+                    }`,
+                    skin: isDarkTheme ? 'oxide-dark' : 'oxide',
+                    content_css: isDarkTheme ? 'dark' : 'default',
+                    branding: false,
+                    body_class: 'mce-content-body',
+                    setup: function(editor) {
+                        editor.on('init', function() {
+                            // Set editor background color
+                            setTimeout(function() {
+                                const iframe = editor.getContentAreaContainer().querySelector('iframe');
+                                if (iframe) {
+                                    iframe.style.backgroundColor = bgColor;
+                                    // Also set the body background inside iframe
+                                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                    if (iframeDoc && iframeDoc.body) {
+                                        iframeDoc.body.style.backgroundColor = bgColor;
+                                        iframeDoc.body.style.color = textColor;
+                                    }
+                                }
+                            }, 100);
+                            
+                            // Sync with textarea on change
+                            editor.on('change keyup', function() {
+                                syncRichTextToTextarea();
+                            });
+                        });
+                    }
+                });
+            }
+        }
+
+        // Sync Rich Text Editor content to textarea
+        function syncRichTextToTextarea() {
+            if (tinymceInstance && tinymceInstance.getContent) {
+                const content = tinymceInstance.getContent();
+                document.getElementById('message').value = content;
+            } else if (typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('richTextEditor');
+                if (editor) {
+                    const content = editor.getContent();
+                    document.getElementById('message').value = content;
+                }
+            }
+        }
+
+        // Get content from Rich Text Editor
+        function getRichTextContent() {
+            if (typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('richTextEditor');
+                if (editor) {
+                    return editor.getContent();
+                }
+            }
+            return '';
+        }
+
+        // Set content in Rich Text Editor
+        function setRichTextContent(content) {
+            if (typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('richTextEditor');
+                if (editor) {
+                    editor.setContent(content || '');
+                    syncRichTextToTextarea();
+                }
+            }
+        }
+
+        // Toggle Rich Text Editor
+        function toggleRichTextEditor() {
+            const richTextContainer = document.getElementById('richTextEditorContainer');
+            const previewContainer = document.getElementById('templatePreviewContainer');
+            const messageTextarea = document.getElementById('message');
+            const toggleRichTextBtn = document.getElementById('toggleRichTextBtn');
+            const toggleEditBtn = document.getElementById('toggleEditBtn');
+
+            if (!richTextContainer || !messageTextarea) return;
+
+            if (richTextContainer.style.display === 'none' || richTextContainer.style.display === '') {
+                // Show Rich Text Editor
+                // Hide other views
+                if (previewContainer) previewContainer.style.display = 'none';
+                messageTextarea.style.display = 'none';
+                richTextContainer.style.display = 'block';
+
+                // Initialize TinyMCE if not already initialized
+                if (typeof tinymce !== 'undefined') {
+                    if (!tinymce.get('richTextEditor')) {
+                        initializeTinyMCE();
+                        // Wait for initialization, then set content
+                        setTimeout(() => {
+                            const editor = tinymce.get('richTextEditor');
+                            if (editor) {
+                                editor.setContent(messageTextarea.value || '');
+                            }
+                        }, 500);
+                    } else {
+                        const editor = tinymce.get('richTextEditor');
+                        if (editor) {
+                            // Load current content from textarea
+                            editor.setContent(messageTextarea.value || '');
+                        }
+                    }
+                } else {
+                    alert('TinyMCE is not loaded. Please refresh the page or check your internet connection.');
+                    richTextContainer.style.display = 'none';
+                    messageTextarea.style.display = 'block';
+                }
+
+                // Update button states
+                if (toggleRichTextBtn) {
+                    toggleRichTextBtn.classList.add('active');
+                    toggleRichTextBtn.innerHTML = '<i class="fas fa-edit"></i> Rich Text Editor (Active)';
+                }
+                if (toggleEditBtn) {
+                    toggleEditBtn.classList.remove('active');
+                }
+
+                isRichTextMode = true;
+            } else {
+                // Hide Rich Text Editor, show textarea
+                richTextContainer.style.display = 'none';
+                messageTextarea.style.display = 'block';
+
+                // Sync content from Rich Text Editor to textarea
+                syncRichTextToTextarea();
+
+                // Update button states
+                if (toggleRichTextBtn) {
+                    toggleRichTextBtn.classList.remove('active');
+                    toggleRichTextBtn.innerHTML = '<i class="fas fa-edit"></i> Rich Text Editor';
+                }
+
+                isRichTextMode = false;
+            }
+        }
+
         // Initialize the campaign manager when the page loads
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize theme first
@@ -2840,30 +3152,52 @@
         // Toggle between preview and edit mode
         function toggleMessageEdit() {
             const previewContainer = document.getElementById('templatePreviewContainer');
+            const richTextContainer = document.getElementById('richTextEditorContainer');
             const messageTextarea = document.getElementById('message');
             const toggleBtn = document.getElementById('toggleEditBtn');
+            const toggleRichTextBtn = document.getElementById('toggleRichTextBtn');
             
             if (previewContainer && messageTextarea) {
                 if (previewContainer.style.display === 'none' || previewContainer.style.display === '') {
                     // Switch to preview mode
-                    const htmlContent = messageTextarea.value;
+                    let htmlContent = '';
+                    
+                    // Get content from Rich Text Editor if active
+                    if (isRichTextMode && typeof tinymce !== 'undefined') {
+                        const editor = tinymce.get('richTextEditor');
+                        if (editor) {
+                            htmlContent = editor.getContent();
+                        }
+                    } else {
+                        htmlContent = messageTextarea.value;
+                    }
+                    
                     if (htmlContent.trim()) {
                         document.getElementById('templatePreview').innerHTML = htmlContent;
                         previewContainer.style.display = 'block';
                         messageTextarea.style.display = 'none';
+                        if (richTextContainer) richTextContainer.style.display = 'none';
                         if (toggleBtn) {
                             toggleBtn.innerHTML = '<i class="fas fa-code"></i> Edit HTML';
+                        }
+                        if (toggleRichTextBtn) {
+                            toggleRichTextBtn.classList.remove('active');
                         }
                     } else {
                         alert('Please enter some HTML content first.');
                     }
                 } else {
-                    // Switch to edit mode
+                    // Switch to edit mode (HTML textarea)
                     previewContainer.style.display = 'none';
                     messageTextarea.style.display = 'block';
+                    if (richTextContainer) richTextContainer.style.display = 'none';
                     if (toggleBtn) {
                         toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Preview';
                     }
+                    if (toggleRichTextBtn) {
+                        toggleRichTextBtn.classList.remove('active');
+                    }
+                    isRichTextMode = false;
                 }
             }
         }
@@ -2871,7 +3205,17 @@
         // Email Preview Functionality (for modal preview)
         function showEmailPreview() {
             const subject = document.getElementById('subject').value || 'No Subject';
-            const message = document.getElementById('message').value || 'No message content';
+            
+            // Get message content from Rich Text Editor if active, otherwise from textarea
+            let message = '';
+            if (isRichTextMode && typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('richTextEditor');
+                if (editor) {
+                    message = editor.getContent();
+                }
+            } else {
+                message = document.getElementById('message').value || 'No message content';
+            }
             
             // Set preview content
             document.getElementById('previewSubject').textContent = subject;
