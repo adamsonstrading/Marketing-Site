@@ -33,6 +33,8 @@ class CampaignController extends Controller
             'smtp_configuration_id' => 'required|exists:smtp_configurations,id',
             'template_id' => 'nullable|exists:email_templates,id',
             'recipients' => 'required|string|min:1',
+            'bcc' => 'nullable|string',
+            'cc' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -138,6 +140,8 @@ class CampaignController extends Controller
                 'name' => $request->name,
                 'subject' => $request->subject,
                 'body' => $request->body,
+                'bcc' => $request->bcc ?? null,
+                'cc' => $request->cc ?? null,
                 'total_recipients' => count($verifiedRecipients),
                 'status' => 'queued',
             ]);

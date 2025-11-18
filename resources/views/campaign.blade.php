@@ -1484,6 +1484,49 @@
                                         <input type="text" class="form-control" id="subject" name="subject" required placeholder="Enter email subject">
                                     </div>
 
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="bcc" class="form-label">
+                                                    <i class="fas fa-eye-slash"></i> BCC (Blind Carbon Copy)
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="bcc" name="bcc" placeholder="email1@example.com, email2@example.com">
+                                                    <div class="btn-group">
+                                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="bccSelectBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            <i class="fas fa-list"></i> Select
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end" id="bccEmailDropdown" style="max-height: 300px; overflow-y: auto;">
+                                                            <li><h6 class="dropdown-header">Select SMTP Email</h6></li>
+                                                            <li><div class="dropdown-item-text text-muted small">Loading emails...</div></li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                <div class="form-text">Add email addresses separated by commas. Recipients won't see these addresses.</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="cc" class="form-label">
+                                                    <i class="fas fa-copy"></i> CC (Carbon Copy)
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="cc" name="cc" placeholder="email1@example.com, email2@example.com">
+                                                    <div class="btn-group">
+                                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="ccSelectBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            <i class="fas fa-list"></i> Select
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end" id="ccEmailDropdown" style="max-height: 300px; overflow-y: auto;">
+                                                            <li><h6 class="dropdown-header">Select SMTP Email</h6></li>
+                                                            <li><div class="dropdown-item-text text-muted small">Loading emails...</div></li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                <div class="form-text">Add email addresses separated by commas. Recipients will see these addresses.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="form-group">
                                         <label for="message" class="form-label">Message (HTML allowed)</label>
                                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1700,6 +1743,7 @@
                 this.loadSenders();
                 this.loadSmtpConfigurations();
                 this.loadEmailTemplates();
+                this.loadSmtpEmails(); // Load emails for BCC/CC dropdowns
                 this.setupEventListeners();
                 this.loadDashboardData();
                 this.loadCampaignsHistory();
@@ -1764,6 +1808,90 @@
                     
                     const select = document.getElementById('smtpConfigSelect');
                     select.innerHTML = '<option value="">Error loading SMTP configurations</option>';
+                }
+            }
+
+            async loadSmtpEmails() {
+                try {
+                    const response = await fetch('/api/smtp-configurations/emails', {
+                        headers: this.getAuthHeaders()
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success && data.emails) {
+                        this.populateEmailDropdowns(data.emails);
+                    }
+                } catch (error) {
+                    console.error('Error loading SMTP emails:', error);
+                }
+            }
+
+            populateEmailDropdowns(emails) {
+                const bccDropdown = document.getElementById('bccEmailDropdown');
+                const ccDropdown = document.getElementById('ccEmailDropdown');
+                
+                if (!bccDropdown || !ccDropdown) return;
+                
+                // Clear loading message
+                bccDropdown.innerHTML = '<li><h6 class="dropdown-header">Select SMTP Email</h6></li>';
+                ccDropdown.innerHTML = '<li><h6 class="dropdown-header">Select SMTP Email</h6></li>';
+                
+                if (emails.length === 0) {
+                    bccDropdown.innerHTML += '<li><div class="dropdown-item-text text-muted small">No SMTP emails available</div></li>';
+                    ccDropdown.innerHTML += '<li><div class="dropdown-item-text text-muted small">No SMTP emails available</div></li>';
+                    return;
+                }
+                
+                emails.forEach(email => {
+                    const displayText = email.is_default 
+                        ? `${email.email} (${email.smtp_name}) - Default`
+                        : `${email.email} (${email.smtp_name})`;
+                    
+                    // BCC dropdown item
+                    const bccItem = document.createElement('li');
+                    bccItem.innerHTML = `<a class="dropdown-item" href="#" data-email="${email.email}">${displayText}</a>`;
+                    bccItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.addEmailToField('bcc', email.email);
+                    });
+                    bccDropdown.appendChild(bccItem);
+                    
+                    // CC dropdown item
+                    const ccItem = document.createElement('li');
+                    ccItem.innerHTML = `<a class="dropdown-item" href="#" data-email="${email.email}">${displayText}</a>`;
+                    ccItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.addEmailToField('cc', email.email);
+                    });
+                    ccDropdown.appendChild(ccItem);
+                });
+            }
+
+            addEmailToField(fieldType, email) {
+                const field = document.getElementById(fieldType);
+                if (!field) return;
+                
+                const currentValue = field.value.trim();
+                const emails = currentValue ? currentValue.split(',').map(e => e.trim()).filter(e => e) : [];
+                
+                // Check if email already exists
+                if (emails.includes(email)) {
+                    return; // Don't add duplicate
+                }
+                
+                // Add the email
+                emails.push(email);
+                field.value = emails.join(', ');
+                
+                // Close the dropdown
+                const dropdown = bootstrap.Dropdown.getInstance(document.getElementById(fieldType + 'SelectBtn'));
+                if (dropdown) {
+                    dropdown.hide();
                 }
             }
 
@@ -2455,6 +2583,15 @@
                         this.refreshLiveStats();
                     });
                 }
+
+                // Sample CSV download event listener
+                const downloadSampleLink = document.getElementById('downloadSample');
+                if (downloadSampleLink) {
+                    downloadSampleLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.downloadSampleCsv();
+                    });
+                }
             }
 
             // CSV file handling
@@ -2471,14 +2608,22 @@
 
             // Sample CSV download
             downloadSampleCsv() {
-                const csvContent = "email,name\njohn@example.com,John Doe\njane@example.com,Jane Smith";
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'sample_recipients.csv';
-                a.click();
-                window.URL.revokeObjectURL(url);
+                try {
+                    const csvContent = "email,name\njohn@example.com,John Doe\njane@example.com,Jane Smith\nbob@example.com,Bob Johnson";
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sample_recipients.csv';
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('Error downloading sample CSV:', error);
+                    this.showAlert('Failed to download sample CSV. Please try again.', 'danger');
+                }
             }
 
             validateEmails(emailText) {
@@ -2621,16 +2766,6 @@
 
                 // Store the parsed data for form submission
                 this.csvData = validData;
-            }
-
-            downloadSampleCsv() {
-                // Download sample CSV from server
-                const a = document.createElement('a');
-                a.href = '/sample-csv';
-                a.download = 'sample_recipients.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
             }
 
             async createCampaign() {

@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/smtp-configurations', [App\Http\Controllers\SmtpConfigurationController::class, 'index']);
             Route::get('/smtp-configurations/active', [App\Http\Controllers\SmtpConfigurationController::class, 'active']);
             Route::get('/smtp-configurations/default', [App\Http\Controllers\SmtpConfigurationController::class, 'default']);
+            Route::get('/smtp-configurations/emails', [App\Http\Controllers\SmtpConfigurationController::class, 'emails']);
             Route::post('/smtp-configurations/{id}/set-default', [App\Http\Controllers\SmtpConfigurationController::class, 'setDefault']);
             Route::post('/smtp-configurations/{id}/toggle-active', [App\Http\Controllers\SmtpConfigurationController::class, 'toggleActive']);
             Route::post('/smtp-configurations/{id}/test', [App\Http\Controllers\SmtpConfigurationController::class, 'test']);
