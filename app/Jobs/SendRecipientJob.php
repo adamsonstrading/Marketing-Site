@@ -29,8 +29,9 @@ class SendRecipientJob implements ShouldQueue
     public function __construct(
         public int $recipientId
     ) {
-        // Add small random delay to prevent sending too fast
-        $this->delay(now()->addSeconds(rand(1, 3)));
+        // Add initial delay to stagger job processing
+        // This helps distribute the load and prevents all emails from starting at once
+        $this->delay(now()->addSeconds(rand(1, 5)));
     }
 
     /**
@@ -158,9 +159,10 @@ class SendRecipientJob implements ShouldQueue
                 return; // Don't send, but don't mark as failed
             }
 
-            // Add small delay between emails to prevent rate limiting
+            // Add delay between emails to prevent rate limiting
             // This helps avoid being blocked by SMTP servers during bulk sending
-            usleep(2000000); // 2 seconds delay (2000000 microseconds)
+            // 15 seconds delay between each email (15,000,000 microseconds)
+            usleep(15000000);
 
             // Prepare dynamic variables for email template
             $firstName = '';
@@ -186,10 +188,60 @@ class SendRecipientJob implements ShouldQueue
 
             // Send the email with dynamic variables
             try {
-                Mail::mailer('smtp')
-                    ->to($recipient->email)
-                    ->bcc($fromAddress) // ensure a copy lands in sender's mailbox
-                    ->send(new CampaignMail($campaign->subject, $campaign->body, $variables));
+                $mail = Mail::mailer('smtp')
+                    ->to($recipient->email);
+                
+                // Add BCC from campaign if specified
+                if ($campaign->bcc) {
+                    $bccEmails = array_filter(array_map('trim', explode(',', $campaign->bcc)));
+                    foreach ($bccEmails as $bccEmail) {
+                        if (filter_var($bccEmail, FILTER_VALIDATE_EMAIL)) {
+                            $mail->bcc($bccEmail);
+                        }
+                    }
+                }
+                
+                // Always BCC the sender address for tracking
+                $mail->bcc($fromAddress);
+                
+                // Automatically BCC appropriate QC email based on sender domain
+                // This ensures all sent emails are copied to quality control
+                $qcEmail = null;
+                
+                // Determine QC email based on sender domain
+                if (str_contains(strtolower($fromAddress), 'businessloans4u.co.uk') || 
+                    str_contains(strtolower($fromAddress), 'businessloans.co.uk')) {
+                    // Business Loans campaigns → BCC to Business Loans QC
+                    $qcEmail = 'qc@businessloans4u.co.uk';
+                } elseif (str_contains(strtolower($fromAddress), 'findaproperty.io')) {
+                    // Finda Property campaigns → BCC to Finda Property QC
+                    $qcEmail = 'qc@findaproperty.io';
+                }
+                
+                // Add QC BCC if determined
+                if ($qcEmail && filter_var($qcEmail, FILTER_VALIDATE_EMAIL)) {
+                    $mail->bcc($qcEmail);
+                    Log::info("Auto-BCC to QC: {$qcEmail} for campaign from {$fromAddress}");
+                }
+                
+                // Add CC from campaign if specified
+                if ($campaign->cc) {
+                    $ccEmails = array_filter(array_map('trim', explode(',', $campaign->cc)));
+                    foreach ($ccEmails as $ccEmail) {
+                        if (filter_var($ccEmail, FILTER_VALIDATE_EMAIL)) {
+                            $mail->cc($ccEmail);
+                        }
+                    }
+                }
+                
+                // Create the mailable with Reply-To header
+                $mailable = new CampaignMail($campaign->subject, $campaign->body, $variables);
+                
+                // Set Reply-To header to sender's email so replies go to marketing@businessloans
+                // This ensures replies are received by the marketing team, not QC
+                $mailable->replyTo($fromAddress, $fromName);
+                
+                $mail->send($mailable);
 
                 // Record success for SMTP rotation
                 if ($smtpConfig) {

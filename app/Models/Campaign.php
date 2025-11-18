@@ -15,6 +15,8 @@ class Campaign extends Model
         'name',
         'subject',
         'body',
+        'bcc',
+        'cc',
         'total_recipients',
         'status',
     ];

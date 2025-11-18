@@ -53,6 +53,31 @@ class SmtpConfigurationController extends Controller
     }
 
     /**
+     * Get all SMTP email addresses for BCC/CC selection
+     */
+    public function emails(): JsonResponse
+    {
+        $configurations = SmtpConfiguration::where('is_active', true)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('name')
+            ->get(['id', 'name', 'from_address', 'from_name', 'is_default']);
+
+        $emails = $configurations->map(function ($config) {
+            return [
+                'email' => $config->from_address,
+                'name' => $config->from_name,
+                'smtp_name' => $config->name,
+                'is_default' => $config->is_default,
+            ];
+        })->unique('email')->values();
+
+        return response()->json([
+            'success' => true,
+            'emails' => $emails
+        ]);
+    }
+
+    /**
      * Store a new SMTP configuration
      */
     public function store(Request $request): JsonResponse
