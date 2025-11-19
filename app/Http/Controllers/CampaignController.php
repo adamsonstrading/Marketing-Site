@@ -186,7 +186,8 @@ class CampaignController extends Controller
                 // This ensures emails start processing right away without blocking the HTTP response
                 if (count($recipientIds) > 0) {
                     // Use exec to run queue processing in background (Windows compatible)
-                    $maxJobs = min(count($recipientIds) + 10, 50);
+                    // Process more jobs initially to handle larger campaigns
+                    $maxJobs = min(count($recipientIds) + 20, 100);
                     $command = sprintf(
                         'php "%s" queue:auto-process --max-jobs=%d > nul 2>&1',
                         base_path('artisan'),

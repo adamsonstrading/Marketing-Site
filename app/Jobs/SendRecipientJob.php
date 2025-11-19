@@ -161,8 +161,8 @@ class SendRecipientJob implements ShouldQueue
 
             // Add delay between emails to prevent rate limiting
             // This helps avoid being blocked by SMTP servers during bulk sending
-            // 15 seconds delay between each email (15,000,000 microseconds)
-            usleep(15000000);
+            // 5 seconds delay between each email (5,000,000 microseconds)
+            usleep(5000000);
 
             // Prepare dynamic variables for email template
             $firstName = '';

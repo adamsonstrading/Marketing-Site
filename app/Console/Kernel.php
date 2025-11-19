@@ -12,9 +12,16 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Process email queue every minute
-        $schedule->command('queue:auto-process --max-jobs=50')
+        // Process email queue every minute (increased max jobs for better throughput)
+        $schedule->command('queue:auto-process --max-jobs=100')
             ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground();
+        
+        // Process remaining jobs for campaigns that are almost done (every 30 seconds)
+        // This ensures the last few emails in campaigns are sent quickly
+        $schedule->command('queue:auto-process --max-jobs=50')
+            ->everyThirtySeconds()
             ->withoutOverlapping()
             ->runInBackground();
         
@@ -22,6 +29,13 @@ class Kernel extends ConsoleKernel
         $schedule->command('campaigns:fix-stuck')
             ->everyFiveMinutes()
             ->withoutOverlapping();
+        
+        // Re-dispatch jobs for pending recipients every 2 minutes
+        // This catches any recipients that lost their jobs
+        $schedule->command('campaigns:process-pending --force')
+            ->everyTwoMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
         
         // Mark stuck recipients as failed every hour
         $schedule->command('campaigns:mark-stuck-failed --hours=2')
