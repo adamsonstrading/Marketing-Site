@@ -42,5 +42,35 @@ class SmtpConfigurationSeeder extends Seeder
             'is_default' => false,
             'description' => 'SMTP configuration for Finda Property marketing emails via IONOS'
         ]);
+
+        // Business Loans QC SMTP Configuration (IONOS)
+        SmtpConfiguration::create([
+            'name' => 'Business Loans QC',
+            'host' => 'smtp.ionos.co.uk',
+            'port' => 587,
+            'username' => 'qc@businessloans4u.co.uk',
+            'password' => 'Adamsons@514@2025',
+            'from_address' => 'qc@businessloans4u.co.uk',
+            'from_name' => 'Business Loans',
+            'encryption' => 'tls',
+            'is_active' => true,
+            'is_default' => false,
+            'description' => 'SMTP configuration for Business Loans quality control emails via IONOS'
+        ]);
+
+        // Finda Property QC SMTP Configuration (IONOS)
+        SmtpConfiguration::create([
+            'name' => 'Finda Property QC',
+            'host' => 'smtp.ionos.co.uk',
+            'port' => 587,
+            'username' => 'qc@findaproperty.io',
+            'password' => 'Adamsons@514@2025',
+            'from_address' => 'qc@findaproperty.io',
+            'from_name' => 'Finda Property',
+            'encryption' => 'tls',
+            'is_active' => true,
+            'is_default' => false,
+            'description' => 'SMTP configuration for Finda Property quality control emails via IONOS'
+        ]);
     }
 }
