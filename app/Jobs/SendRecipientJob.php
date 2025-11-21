@@ -169,19 +169,22 @@ class SendRecipientJob implements ShouldQueue
             $lastName = '';
             $fullName = '';
             
-            // Only process name if it exists and is not empty
+            // Only use name if it's explicitly provided with the email
+            // If only email is provided (no name), leave name variables empty
             if ($recipient->name && trim($recipient->name) !== '') {
+                // Use the name from recipient if available
                 $fullName = trim($recipient->name);
                 $nameParts = explode(' ', $fullName, 2);
                 $firstName = $nameParts[0] ?? '';
                 $lastName = $nameParts[1] ?? '';
             }
+            // If no name is provided, all name variables remain empty (no fallback to email)
 
             $variables = [
-                'name' => $fullName, // Empty string if no name, otherwise use the name
+                'name' => $fullName, // Empty string if no name provided
                 'email' => $recipient->email,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
+                'first_name' => $firstName, // Empty string if no name provided
+                'last_name' => $lastName, // Empty string if no name provided
                 'campaign_name' => $campaign->name,
                 'sender_name' => $fromName,
             ];
