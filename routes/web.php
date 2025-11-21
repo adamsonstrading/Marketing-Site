@@ -59,6 +59,8 @@ Route::middleware('auth')->group(function () {
             // Campaign control routes
             Route::post('/campaigns/{id}/pause', [App\Http\Controllers\CampaignController::class, 'pause']);
             Route::post('/campaigns/{id}/resume', [App\Http\Controllers\CampaignController::class, 'resume']);
+            Route::delete('/campaigns/{id}', [App\Http\Controllers\CampaignController::class, 'destroy']);
+            Route::post('/campaigns/restart-stuck', [App\Http\Controllers\CampaignController::class, 'restartStuckCampaigns']);
             
             // Blacklist routes
             Route::get('/blacklist', [App\Http\Controllers\BlacklistController::class, 'index']);

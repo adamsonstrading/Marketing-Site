@@ -792,6 +792,17 @@
         .campaign-history-header:hover {
             background: var(--card-bg) !important;
         }
+        
+        .campaign-history-header .btn-group {
+            z-index: 10;
+            position: relative;
+            display: inline-flex;
+        }
+        
+        .campaign-history-header .btn-group .btn {
+            min-width: 70px;
+            white-space: nowrap;
+        }
 
         .campaign-history-details {
             border-top: 1px solid var(--border-color);
@@ -1397,9 +1408,12 @@
                                     <i class="fas fa-history"></i>
                                     Campaign History
                                 </h3>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.campaignManager?.loadCampaignsHistory()">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshHistoryBtn" onclick="window.campaignManager?.refreshCampaignsHistory()" title="Refresh and restart stuck campaigns">
                                     <i class="fas fa-sync-alt"></i> Refresh
                                 </button>
+                                <span id="autoRefreshIndicator" class="badge bg-info ms-2" style="display: none;" title="Auto-refreshing every 30 seconds">
+                                    <i class="fas fa-sync fa-spin"></i> Auto-refresh Active
+                                </span>
                             </div>
                             <div class="card-body">
                                 <div id="campaignsHistoryContainer">
@@ -1735,6 +1749,7 @@
                 this.currentCampaignId = null;
                 this.pollingInterval = null;
                 this.dashboardRefreshInterval = null;
+                this.campaignHistoryRefreshInterval = null;
                 this.csvData = null;
                 this.init();
             }
@@ -2048,10 +2063,10 @@
                     // Load immediately
                     await this.refreshDashboardData();
                     
-                    // Then refresh every 30 seconds (reduced frequency for production)
+                    // Then refresh every 60 seconds (optimized for performance)
                     this.dashboardRefreshInterval = setInterval(() => {
                         this.refreshDashboardData();
-                    }, 30000); // 30 seconds instead of 10
+                    }, 60000); // 60 seconds (reduced from 30 for better performance) instead of 10
                 } else {
                     // Just refresh once if interval already exists
                     this.refreshDashboardData();
@@ -2158,8 +2173,71 @@
             
             
             // Campaign History Functions
-            async loadCampaignsHistory() {
+            async refreshCampaignsHistory() {
+                const refreshBtn = document.getElementById('refreshHistoryBtn');
+                const originalHtml = refreshBtn ? refreshBtn.innerHTML : '';
+                
+                // Show loading state
+                if (refreshBtn) {
+                    refreshBtn.disabled = true;
+                    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+                }
+                
                 try {
+                    // Restart stuck campaigns first
+                    try {
+                        const restartResponse = await fetch('/api/campaigns/restart-stuck', {
+                            method: 'POST',
+                            headers: this.getAuthHeaders()
+                        });
+                        const restartData = await restartResponse.json();
+                        
+                        if (restartData.success && restartData.total_campaigns_restarted > 0) {
+                            // Show success message
+                            this.showAlert(
+                                `Restarted ${restartData.total_campaigns_restarted} stuck campaign(s) with ${restartData.total_recipients_restarted} pending recipients. Emails are being sent...`,
+                                'success'
+                            );
+                        } else if (restartData.success) {
+                            // No stuck campaigns found - don't show message for manual refresh
+                        }
+                    } catch (restartError) {
+                        console.error('Error restarting stuck campaigns:', restartError);
+                        // Continue to load history even if restart fails
+                    }
+                    
+                    // Load campaign history (without auto-restart for manual refresh)
+                    await this.loadCampaignsHistory(false);
+                    
+                } finally {
+                    // Restore button state
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = originalHtml;
+                    }
+                }
+            }
+            
+            async loadCampaignsHistory(autoRestart = false) {
+                try {
+                    // If auto-restart is enabled, restart stuck campaigns first
+                    if (autoRestart) {
+                        try {
+                            const restartResponse = await fetch('/api/campaigns/restart-stuck', {
+                                method: 'POST',
+                                headers: this.getAuthHeaders()
+                            });
+                            const restartData = await restartResponse.json();
+                            
+                            if (restartData.success && restartData.total_campaigns_restarted > 0) {
+                                console.log(`Auto-restarted ${restartData.total_campaigns_restarted} stuck campaign(s)`);
+                            }
+                        } catch (restartError) {
+                            console.error('Error auto-restarting stuck campaigns:', restartError);
+                            // Continue to load history even if restart fails
+                        }
+                    }
+                    
                     const response = await fetch('/api/campaigns-history', {
                         headers: this.getAuthHeaders()
                     });
@@ -2167,6 +2245,9 @@
                     
                     if (data.success) {
                         this.displayCampaignsHistory(data.data);
+                        
+                        // Check if any campaigns are in sending mode and manage auto-refresh
+                        this.manageCampaignHistoryAutoRefresh(data.data);
                     } else {
                         document.getElementById('campaignsHistoryContainer').innerHTML = 
                             '<div class="alert alert-danger">Failed to load campaign history: ' + (data.message || 'Unknown error') + '</div>';
@@ -2175,6 +2256,136 @@
                     console.error('Error loading campaigns history:', error);
                     document.getElementById('campaignsHistoryContainer').innerHTML = 
                         '<div class="alert alert-danger">Error loading campaign history: ' + error.message + '</div>';
+                }
+            }
+            
+            // Check if any campaigns are in sending mode and manage auto-refresh
+            manageCampaignHistoryAutoRefresh(campaigns) {
+                const hasSendingCampaigns = campaigns && campaigns.some(campaign => 
+                    campaign.status === 'sending' || campaign.status === 'queued'
+                );
+                
+                if (hasSendingCampaigns) {
+                    // Start auto-refresh if not already running
+                    if (!this.campaignHistoryRefreshInterval) {
+                        console.log('Starting auto-refresh for campaign history (campaigns in sending mode)');
+                        this.startCampaignHistoryAutoRefresh();
+                    }
+                } else {
+                    // Stop auto-refresh if no campaigns are sending
+                    if (this.campaignHistoryRefreshInterval) {
+                        console.log('Stopping auto-refresh (no campaigns in sending mode)');
+                        this.stopCampaignHistoryAutoRefresh();
+                    }
+                }
+            }
+            
+            // Start auto-refresh for campaign history
+            startCampaignHistoryAutoRefresh() {
+                // Clear any existing interval
+                this.stopCampaignHistoryAutoRefresh();
+                
+                // Show auto-refresh indicator
+                const indicator = document.getElementById('autoRefreshIndicator');
+                if (indicator) {
+                    indicator.style.display = 'inline-block';
+                }
+                
+                // Refresh every 30 seconds with auto-restart
+                this.campaignHistoryRefreshInterval = setInterval(() => {
+                    this.loadCampaignsHistory(true); // true = auto-restart stuck campaigns
+                }, 30000); // 30 seconds
+            }
+            
+            // Stop auto-refresh for campaign history
+            stopCampaignHistoryAutoRefresh() {
+                if (this.campaignHistoryRefreshInterval) {
+                    clearInterval(this.campaignHistoryRefreshInterval);
+                    this.campaignHistoryRefreshInterval = null;
+                }
+                
+                // Hide auto-refresh indicator
+                const indicator = document.getElementById('autoRefreshIndicator');
+                if (indicator) {
+                    indicator.style.display = 'none';
+                }
+            }
+            
+            // Campaign control functions
+            async pauseCampaign(campaignId) {
+                if (!confirm('Are you sure you want to pause this campaign? Emails will stop sending.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${campaignId}/pause`, {
+                        method: 'POST',
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert(data.message, 'success');
+                        // Refresh campaign history
+                        await this.loadCampaignsHistory();
+                    } else {
+                        this.showAlert(data.message || 'Failed to pause campaign', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error pausing campaign:', error);
+                    this.showAlert('Error pausing campaign: ' + error.message, 'error');
+                }
+            }
+            
+            async resumeCampaign(campaignId) {
+                if (!confirm('Are you sure you want to resume this campaign? Emails will start sending again.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${campaignId}/resume`, {
+                        method: 'POST',
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert(data.message, 'success');
+                        // Refresh campaign history
+                        await this.loadCampaignsHistory();
+                    } else {
+                        this.showAlert(data.message || 'Failed to resume campaign', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error resuming campaign:', error);
+                    this.showAlert('Error resuming campaign: ' + error.message, 'error');
+                }
+            }
+            
+            async deleteCampaign(campaignId, campaignName) {
+                if (!confirm(`Are you sure you want to delete the campaign "${campaignName}"? This will also delete all recipients associated with this campaign. This action cannot be undone.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/campaigns/${campaignId}`, {
+                        method: 'DELETE',
+                        headers: this.getAuthHeaders()
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showAlert(data.message, 'success');
+                        // Refresh campaign history
+                        await this.loadCampaignsHistory();
+                        // Also refresh dashboard
+                        await this.refreshDashboardData();
+                    } else {
+                        this.showAlert(data.message || 'Failed to delete campaign', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting campaign:', error);
+                    this.showAlert('Error deleting campaign: ' + error.message, 'error');
                 }
             }
             
@@ -2193,10 +2404,9 @@
                     
                     return `
                         <div class="campaign-history-card mb-3" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                            <div class="campaign-history-header" style="background: var(--secondary-bg); padding: 15px 20px; cursor: pointer;" 
-                                 onclick="toggleCampaignDetails(${campaign.id})">
+                            <div class="campaign-history-header" style="background: var(--secondary-bg); padding: 15px 20px;">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <div class="flex-grow-1">
+                                    <div class="flex-grow-1" style="cursor: pointer;" onclick="toggleCampaignDetails(${campaign.id})">
                                         <h5 class="mb-1" style="color: var(--text-primary);">
                                             <i class="fas fa-envelope me-2"></i>${this.escapeHtml(campaign.name)}
                                         </h5>
@@ -2212,8 +2422,23 @@
                                         </div>
                                     </div>
                                     <div class="d-flex align-items-center gap-2">
-                                        <span class="badge bg-${statusColor}">${statusIcon} ${campaign.status}</span>
-                                        <i class="fas fa-chevron-down" id="chevron-${campaign.id}" style="transition: transform 0.3s;"></i>
+                                        <div class="btn-group" role="group" style="display: inline-flex !important; z-index: 10;">
+                                            ${(campaign.status === 'sending' || campaign.status === 'queued') ? `
+                                                <button type="button" class="btn btn-sm btn-warning" onclick="event.stopPropagation(); window.campaignManager?.pauseCampaign(${campaign.id})" title="Pause Campaign">
+                                                    <i class="fas fa-pause"></i> Pause
+                                                </button>
+                                            ` : ''}
+                                            ${campaign.status === 'paused' ? `
+                                                <button type="button" class="btn btn-sm btn-success" onclick="event.stopPropagation(); window.campaignManager?.resumeCampaign(${campaign.id})" title="Resume Campaign">
+                                                    <i class="fas fa-play"></i> Resume
+                                                </button>
+                                            ` : ''}
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="event.stopPropagation(); window.campaignManager?.deleteCampaign(${campaign.id}, '${this.escapeHtml(campaign.name.replace(/'/g, "\\'"))}')" title="Delete Campaign">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                        <span class="badge bg-${statusColor}" style="cursor: pointer;" onclick="toggleCampaignDetails(${campaign.id})">${statusIcon} ${campaign.status}</span>
+                                        <i class="fas fa-chevron-down" id="chevron-${campaign.id}" style="transition: transform 0.3s; cursor: pointer;" onclick="toggleCampaignDetails(${campaign.id})"></i>
                                     </div>
                                 </div>
                             </div>
@@ -2460,8 +2685,8 @@
                 }
             }
             
-            // Pause/Resume Campaign Functions
-            async pauseCampaign() {
+            // Pause/Resume Current Campaign Functions (for campaign creation page)
+            async pauseCurrentCampaign() {
                 if (!this.currentCampaignId) {
                     this.showAlert('No active campaign to pause', 'warning');
                     return;
@@ -2492,7 +2717,7 @@
                 }
             }
             
-            async resumeCampaign() {
+            async resumeCurrentCampaign() {
                 if (!this.currentCampaignId) {
                     this.showAlert('No active campaign to resume', 'warning');
                     return;
@@ -2814,9 +3039,9 @@
                         }
                     }
 
-                    // Add timeout to prevent hanging (60 seconds)
+                    // Add timeout to prevent hanging (120 seconds for large campaigns)
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 60000);
+                    const timeoutId = setTimeout(() => controller.abort(), 120000);
                     
                     let response;
                     try {
@@ -3260,19 +3485,22 @@
                 originalShowTab(tabName);
                 setTimeout(forceTextVisibility, 100); // Small delay to ensure DOM is updated
                 
+                const campaignManager = window.campaignManager;
+                if (!campaignManager) return;
+                
                 // Refresh dashboard data when switching to dashboard tab (only if not already refreshing)
                 if (tabName === 'dashboard') {
-                    const campaignManager = window.campaignManager;
-                    if (campaignManager) {
-                        // Only refresh once, don't restart the interval
-                        campaignManager.refreshDashboardData();
-                    }
+                    // Only refresh once, don't restart the interval
+                    campaignManager.refreshDashboardData();
+                    // Stop campaign history auto-refresh when on dashboard tab
+                    campaignManager.stopCampaignHistoryAutoRefresh();
+                } else if (tabName === 'history') {
+                    // When switching to history tab, check if auto-refresh is needed
+                    campaignManager.loadCampaignsHistory(false); // Load without auto-restart first
                 } else {
-                    // Stop refreshing when switching away from dashboard
-                    const campaignManager = window.campaignManager;
-                    if (campaignManager) {
-                        campaignManager.stopDashboardRefresh();
-                    }
+                    // Stop refreshing when switching away from dashboard or history
+                    campaignManager.stopDashboardRefresh();
+                    campaignManager.stopCampaignHistoryAutoRefresh();
                 }
             };
             

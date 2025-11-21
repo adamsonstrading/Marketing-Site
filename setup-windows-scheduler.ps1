@@ -35,10 +35,10 @@ if ($existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 }
 
-# Create the action (run every minute)
-$action = New-ScheduledTaskAction -Execute $phpPath -Argument "`"$artisanPath`" queue:auto-process --max-jobs=50" -WorkingDirectory $scriptPath
+# Create the action (run Laravel scheduler which processes queue every 30 seconds)
+$action = New-ScheduledTaskAction -Execute $phpPath -Argument "`"$artisanPath`" schedule:run" -WorkingDirectory $scriptPath
 
-# Create the trigger (every minute)
+# Create the trigger (every minute - Laravel scheduler handles the 30-second intervals internally)
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 365)
 
 # Create settings
